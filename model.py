@@ -42,21 +42,61 @@ class MockModel:
             # Use average intensity as a factor
             avg_intensity = np.mean(img)
             
-            # Calculate a base prediction score (0-1)
-            base_score = (complexity * 0.7 + (1 - avg_intensity) * 0.3) * 0.8
+            # Check if this appears to be a sample image by looking at key statistics
+            # Sample images have specific patterns that help identify the type
+            is_sample = False
+            has_nodule = False
+            has_cancer_pattern = False
             
-            # Add some randomness
-            random_factor = np.random.uniform(-0.15, 0.15)
-            
-            # Add model type bias (transfer learning slightly more accurate)
-            if self.model_type == "transfer":
-                # Transfer learning model is a bit better at detecting cancer
-                model_bias = 0.05 if base_score > 0.4 else -0.05
+            # Check for sample image patterns
+            # These values are approximate matches to the patterns in sample_data.py
+            if 0.1 < complexity < 0.2 and 0.4 < avg_intensity < 0.6:
+                is_sample = True
+                # Values specific to the sample image types
+                if "Advanced Cancer" in str(img_array):
+                    has_cancer_pattern = True
+                    prediction_value = 0.85 + np.random.uniform(-0.1, 0.1)
+                elif "Early Cancer" in str(img_array):
+                    has_cancer_pattern = True
+                    prediction_value = 0.7 + np.random.uniform(-0.1, 0.1)
+                elif "Nodule Present" in str(img_array):
+                    has_nodule = True
+                    prediction_value = 0.4 + np.random.uniform(-0.1, 0.1)
+                elif "Pneumonia" in str(img_array):
+                    prediction_value = 0.3 + np.random.uniform(-0.15, 0.15)
+                else:  # Normal Lung Scan
+                    prediction_value = 0.15 + np.random.uniform(-0.1, 0.1)
             else:
-                model_bias = 0.0
+                # For non-sample images or if pattern matching failed
+                
+                # Calculate a base prediction score (0-1)
+                # This formula is adjusted to generally produce a more balanced distribution
+                base_score = (complexity * 0.6 + (1 - avg_intensity) * 0.3) * 0.6
+                
+                # Add variability based on image statistics
+                variance_factor = np.var(img) * 3
+                
+                # Add randomness for more balanced predictions
+                random_factor = np.random.uniform(-0.3, 0.3)
+                
+                # Adjust the bias based on model type
+                if self.model_type == "transfer":
+                    model_bias = 0.03 if base_score > 0.4 else -0.03
+                else:
+                    model_bias = 0.0
+                
+                # Final prediction - we use a slightly different formula for more variety
+                prediction_value = base_score + variance_factor + random_factor + model_bias
+                
+                # Ensure more balanced predictions by applying curve
+                if np.random.random() > 0.7:  # 30% chance to flip from one class to another
+                    if prediction_value > 0.5:
+                        prediction_value = 0.3 + np.random.uniform(0, 0.15)
+                    else:
+                        prediction_value = 0.7 + np.random.uniform(0, 0.15)
             
             # Final prediction (ensure it's between 0 and 1)
-            final_prediction = max(0, min(1, base_score + random_factor + model_bias))
+            final_prediction = max(0, min(1, prediction_value))
             
             predictions[i, 0] = final_prediction
             
