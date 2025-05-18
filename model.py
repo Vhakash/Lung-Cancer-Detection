@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import random
+import streamlit as st
 
 class MockModel:
     """A mock model that simulates CNN predictions for lung cancer detection.
@@ -42,30 +43,32 @@ class MockModel:
             # Use average intensity as a factor
             avg_intensity = np.mean(img)
             
-            # Check if this appears to be a sample image by looking at key statistics
-            # Sample images have specific patterns that help identify the type
-            is_sample = False
-            has_nodule = False
-            has_cancer_pattern = False
+            # Get a consistent hash value based on image data to ensure same predictions
+            # for the same image every time
+            image_hash = hash(str(np.sum(img)) + str(np.mean(img)) + str(np.std(img)))
+            np.random.seed(image_hash)
             
-            # Check for sample image patterns
-            # These values are approximate matches to the patterns in sample_data.py
-            if 0.1 < complexity < 0.2 and 0.4 < avg_intensity < 0.6:
-                is_sample = True
-                # Values specific to the sample image types
-                if "Advanced Cancer" in str(img_array):
-                    has_cancer_pattern = True
-                    prediction_value = 0.85 + np.random.uniform(-0.1, 0.1)
-                elif "Early Cancer" in str(img_array):
-                    has_cancer_pattern = True
-                    prediction_value = 0.7 + np.random.uniform(-0.1, 0.1)
-                elif "Nodule Present" in str(img_array):
-                    has_nodule = True
-                    prediction_value = 0.4 + np.random.uniform(-0.1, 0.1)
-                elif "Pneumonia" in str(img_array):
-                    prediction_value = 0.3 + np.random.uniform(-0.15, 0.15)
-                else:  # Normal Lung Scan
-                    prediction_value = 0.15 + np.random.uniform(-0.1, 0.1)
+            # Sample image detection based on image name from session state
+            sample_name = ""
+            if 'sample_option' in st.session_state:
+                sample_name = st.session_state.sample_option
+            
+            # Set fixed predictions based on sample names
+            if sample_name == "Normal Lung Scan":
+                # Healthy with high confidence
+                prediction_value = 0.15
+            elif sample_name == "Nodule Present":
+                # Suspicious but not cancer
+                prediction_value = 0.35
+            elif sample_name == "Early Cancer Signs":
+                # Early cancer with medium confidence
+                prediction_value = 0.65
+            elif sample_name == "Advanced Cancer":
+                # Advanced cancer with high confidence
+                prediction_value = 0.90
+            elif sample_name == "Pneumonia Case":
+                # Not cancer but abnormal
+                prediction_value = 0.25
             else:
                 # For non-sample images or if pattern matching failed
                 

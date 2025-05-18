@@ -82,19 +82,19 @@ def generate_normal_lung(size=(512, 512)):
         # Random line-like structures within lungs
         if np.random.random() < 0.5:
             # Left lung vessels
-            start_x = int(w/4 + np.random.normal(0, w/12))
-            start_y = int(h/2 + np.random.normal(0, h/6))
-            end_x = int(start_x + np.random.normal(0, w/20))
-            end_y = int(start_y + np.random.normal(0, h/20))
+            start_x = min(w-1, max(0, int(w/4 + np.random.normal(0, w/12))))
+            start_y = min(h-1, max(0, int(h/2 + np.random.normal(0, h/6))))
+            end_x = min(w-1, max(0, int(start_x + np.random.normal(0, w/20))))
+            end_y = min(h-1, max(0, int(start_y + np.random.normal(0, h/20))))
             
             if left_ellipse[start_y, start_x] and left_ellipse[end_y, end_x]:
                 cv2_line(img, (start_x, start_y), (end_x, end_y), 130, 2)
         else:
             # Right lung vessels
-            start_x = int(3*w/4 + np.random.normal(0, w/12))
-            start_y = int(h/2 + np.random.normal(0, h/6))
-            end_x = int(start_x + np.random.normal(0, w/20))
-            end_y = int(start_y + np.random.normal(0, h/20))
+            start_x = min(w-1, max(0, int(3*w/4 + np.random.normal(0, w/12))))
+            start_y = min(h-1, max(0, int(h/2 + np.random.normal(0, h/6))))
+            end_x = min(w-1, max(0, int(start_x + np.random.normal(0, w/20))))
+            end_y = min(h-1, max(0, int(start_y + np.random.normal(0, h/20))))
             
             if right_ellipse[start_y, start_x] and right_ellipse[end_y, end_x]:
                 cv2_line(img, (start_x, start_y), (end_x, end_y), 130, 2)
