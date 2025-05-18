@@ -43,10 +43,13 @@ class MockModel:
             # Use average intensity as a factor
             avg_intensity = np.mean(img)
             
-            # Get a consistent hash value based on image data to ensure same predictions
-            # for the same image every time
-            image_hash = hash(str(np.sum(img)) + str(np.mean(img)) + str(np.std(img)))
-            np.random.seed(image_hash)
+            # Use a simple deterministic approach based on image statistics
+            # Convert image statistics to a valid seed value (0 to 2^32-1)
+            img_sum = np.sum(img)
+            img_mean = np.mean(img)
+            img_std = np.std(img)
+            seed_value = int((img_sum * img_mean * 1000) % (2**32 - 1))
+            np.random.seed(seed_value)
             
             # Sample image detection based on image name from session state
             sample_name = ""
@@ -115,9 +118,11 @@ class MockModel:
         Returns:
             numpy.ndarray: Feature maps from the specified layer
         """
-        # Set random seed based on image statistics for consistent results
-        seed = int(np.mean(img_array) * 1000)
-        np.random.seed(seed)
+        # Set a safe random seed based on image statistics for consistent results
+        # Make sure the seed is within valid range (0 to 2^32-1)
+        img_mean = np.mean(img_array)
+        safe_seed = int(abs(img_mean * 1000) % (2**32 - 1))
+        np.random.seed(safe_seed)
         
         # Create a mock feature map
         if layer_index == 1:
@@ -141,26 +146,57 @@ class MockModel:
         Returns:
             numpy.ndarray: A mock activation map highlighting areas of interest
         """
-        # Set random seed based on image statistics for consistent results
-        seed = int(np.sum(img_array) * 100) % 1000
-        np.random.seed(seed)
+        # Set a safe random seed based on image statistics for consistent results
+        # Make sure the seed is within valid range (0 to 2^32-1)
+        img_sum = abs(np.sum(img_array))
+        safe_seed = int(img_sum * 100) % (2**32 - 1)
+        np.random.seed(safe_seed)
         
         # Create a mock activation map
         h, w = img_array.shape[0], img_array.shape[1]
         
         # Create a gaussian-like activation centered somewhere in the image
         y, x = np.ogrid[-h//2:h//2, -w//2:w//2]
-        # Randomly position the center of the activation
-        center_y = np.random.randint(-h//4, h//4)
-        center_x = np.random.randint(-w//4, w//4)
         
-        # Create the activation map
-        mask = (x - center_x)**2 + (y - center_y)**2 <= min(h, w)//3
-        activation_map = np.zeros((h, w))
-        activation_map[mask] = np.random.uniform(0.7, 1.0, size=np.sum(mask))
+        # Determine if this should be cancer-like or normal
+        # Get sample name from session state if available
+        is_cancer = False
+        sample_name = ""
+        if 'sample_option' in st.session_state:
+            sample_name = st.session_state.sample_option
+            if "Cancer" in sample_name:
+                is_cancer = True
+        
+        # For cancer cases, create specific patterns that look like tumors
+        if is_cancer:
+            # Create multiple activation centers for cancer cases
+            activation_map = np.zeros((h, w))
+            
+            # Primary spot
+            center_y = np.random.randint(-h//4, h//4)
+            center_x = np.random.randint(-w//4, w//4)
+            radius = min(h, w)//4
+            mask1 = (x - center_x)**2 + (y - center_y)**2 <= radius
+            activation_map[mask1] = np.random.uniform(0.8, 1.0, size=np.sum(mask1))
+            
+            # Secondary spots for advanced cancer
+            if "Advanced" in sample_name:
+                for _ in range(2):
+                    sec_y = np.random.randint(-h//3, h//3)
+                    sec_x = np.random.randint(-w//3, w//3)
+                    sec_radius = min(h, w)//8
+                    sec_mask = (x - sec_x)**2 + (y - sec_y)**2 <= sec_radius
+                    activation_map[sec_mask] = np.random.uniform(0.6, 0.9, size=np.sum(sec_mask))
+        else:
+            # For normal cases, minimal activation or diffuse pattern
+            activation_map = np.zeros((h, w))
+            center_y = np.random.randint(-h//4, h//4)
+            center_x = np.random.randint(-w//4, w//4)
+            mask = (x - center_x)**2 + (y - center_y)**2 <= min(h, w)//5
+            activation_map[mask] = np.random.uniform(0.3, 0.6, size=np.sum(mask))
         
         # Add some noise
-        activation_map += np.random.uniform(0, 0.3, size=(h, w))
+        activation_map += np.random.uniform(0, 0.2, size=(h, w))
         
         # Normalize
         activation_map = (activation_map - activation_map.min()) / (activation_map.max() - activation_map.min() + 1e-8)

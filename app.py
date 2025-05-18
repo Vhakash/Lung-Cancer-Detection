@@ -27,36 +27,48 @@ st.set_page_config(
     layout="wide"
 )
 
-# Application title and description
-st.title("Lung Cancer Detection using CNN")
+# Application title and description with a more creative design
 st.markdown("""
-This application uses a Convolutional Neural Network (CNN) to detect the presence of lung cancer in medical images.
-Upload a lung CT scan or X-ray image to get a prediction.
+# 🫁 Lung Cancer Detection AI
 """)
 
-# Sidebar with options
-st.sidebar.title("Settings")
+# Create a more engaging intro with columns
+col1, col2 = st.columns([2,1])
+with col1:
+    st.markdown("""
+    ### Early detection saves lives
+    This AI-powered tool analyzes medical images to detect potential signs of lung cancer.
+    Simply upload a lung CT scan or X-ray image, or try one of our sample images.
+    """)
+with col2:
+    st.image("https://raw.githubusercontent.com/streamlit/example-data/master/logo.jpg", width=150)
+    
+# Add a divider for better visual organization
+st.divider()
 
-# Model options
-st.sidebar.subheader("Model Options")
+# Sidebar with options
+st.sidebar.markdown("## 🔧 Analysis Settings")
+
+# Model options with emojis for visual appeal
+st.sidebar.markdown("### 🧠 Model Selection")
 model_option = st.sidebar.selectbox(
-    "Select Model",
+    "Choose AI Model",
     ["Basic CNN", "InceptionV3 Transfer Learning"],
     index=0
 )
 
 # Visualization options
-st.sidebar.subheader("Visualization Options")
+st.sidebar.markdown("### 📊 Visualization Tools")
 visualization_option = st.sidebar.selectbox(
-    "Visualization Type",
+    "Choose Visualization",
     ["Prediction Confidence", "Class Activation Maps", "Feature Maps"],
     index=0
 )
 
-# Image Enhancement options
-st.sidebar.subheader("Image Enhancement")
+# Image Enhancement options with emoji
+st.sidebar.markdown("### 🔍 Image Enhancement")
 enhancement_option = st.sidebar.selectbox(
-    "Enhancement Type",
+    "Enhancement Technique",
     ["None"] + get_available_enhancements(),
     index=0
 )
@@ -70,10 +82,10 @@ enhancement_strength = st.sidebar.slider(
     disabled=(enhancement_option == "None")
 )
 
-# Sample Images
-st.sidebar.subheader("Sample Images")
+# Sample Images with emoji
+st.sidebar.markdown("### 🔬 Sample Medical Images")
 sample_option = st.sidebar.selectbox(
-    "Select Sample Image",
+    "Select Sample Case",
     ["None"] + get_sample_image_names(),
     index=0
 )
