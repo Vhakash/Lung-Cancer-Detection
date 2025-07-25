@@ -100,8 +100,28 @@ Lung-Cancer-Detection/
 ├── image_enhancement.py       # Image enhancement techniques
 └── requirements.txt           # Python dependencies
 ```
+## Key Files
+app.py: The main application file that integrates all functionalities.
 
+image_enhancement.py: Contains various image enhancement techniques such as contrast adjustment, histogram equalization, and sharpening.
+
+visualization.py: Provides tools for visualizing predictions, activation maps, and feature maps.
+model.py: Defines AI models and their loading mechanisms.
+
+preprocessing.py: Handles image preprocessing tasks like normalization and color channel adjustments.
+
+utils.py: Includes utility functions for DICOM file handling, history management, and prediction confidence calculation.
 ---
+
+##Image Enhancement Techniques
+The following enhancement techniques are available in the app:
+
+1. Contrast Enhancement: Improves the contrast of the image.
+2. Histogram Equalization: Enhances the image by redistributing pixel intensities.
+3. Adaptive Histogram Equalization: Applies localized histogram equalization for better contrast.
+4. Gaussian Smoothing: Reduces noise and smoothens the image.
+5. Edge Enhancement: Highlights edges in the image for better feature visibility.
+6. Sharpening: Enhances the sharpness of the image.
 
 ## License
 
