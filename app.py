@@ -9,6 +9,8 @@ import io
 import time
 import random
 
+print("App is starting...")
+
 # Import our functionality from module files
 from model import MockModel, create_model, load_pretrained_model
 from preprocessing import preprocess_image, ensure_color_channels
