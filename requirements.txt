@@ -5,9 +5,6 @@ matplotlib
 scikit-learn
 opencv-python
 pillow
-tensorflow
-keras
-scipy
 seaborn
 pydicom
 scikit-image

@@ -4,6 +4,7 @@ import io
 import os
 import base64
 import streamlit as st
+import cv2
 
 # The sample image data will be generated programmatically using numpy
 # We'll create different types of sample images that mimic lung scans
