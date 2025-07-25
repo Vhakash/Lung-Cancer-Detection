@@ -1,3 +1,4 @@
+streamlit
 numpy
 pandas
 matplotlib
@@ -8,4 +9,5 @@ tensorflow
 keras
 scipy
 seaborn
-jupyter
+pydicom
+scikit-image
