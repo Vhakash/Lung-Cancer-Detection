@@ -20,12 +20,13 @@ class MockModel:
         self.model_type = model_type
         self.name = "Basic CNN" if model_type == "basic" else "Transfer Learning"
     
-    def predict(self, img_array):
+    def predict(self, img_array, sample_name=None):
         """Generate a prediction based on image characteristics.
         
         Args:
             img_array: A numpy array of shape (batch_size, height, width, channels)
                 representing the input image(s)
+            sample_name (str, optional): The name of the sample image, if applicable.
                 
         Returns:
             numpy.ndarray: An array of predictions with shape (batch_size, 1)
@@ -51,29 +52,53 @@ class MockModel:
             seed_value = int((img_sum * img_mean * 1000) % (2**32 - 1))
             np.random.seed(seed_value)
             
-            # Sample image detection based on image name from session state
-            sample_name = ""
-            if 'sample_option' in st.session_state:
-                sample_name = st.session_state.sample_option
-            
             # Set fixed predictions based on sample names
-            if sample_name == "Normal Lung Scan":
-                # Healthy with high confidence
-                prediction_value = 0.15
-            elif sample_name == "Nodule Present":
-                # Suspicious but not cancer
-                prediction_value = 0.35
-            elif sample_name == "Early Cancer Signs":
-                # Early cancer with medium confidence
-                prediction_value = 0.65
-            elif sample_name == "Advanced Cancer":
-                # Advanced cancer with high confidence
-                prediction_value = 0.90
-            elif sample_name == "Pneumonia Case":
-                # Not cancer but abnormal
-                prediction_value = 0.25
+            if sample_name:
+                if sample_name == "Normal Lung Scan":
+                    # Healthy with high confidence
+                    prediction_value = 0.15
+                elif sample_name == "Nodule Present":
+                    # Suspicious but not cancer
+                    prediction_value = 0.35
+                elif sample_name == "Early Cancer Signs":
+                    # Early cancer with medium confidence
+                    prediction_value = 0.65
+                elif sample_name == "Advanced Cancer":
+                    # Advanced cancer with high confidence
+                    prediction_value = 0.90
+                elif sample_name == "Pneumonia Case":
+                    # Not cancer but abnormal
+                    prediction_value = 0.25
+                else:
+                    # For non-sample images or if pattern matching failed
+                    
+                    # Calculate a base prediction score (0-1)
+                    # This formula is adjusted to generally produce a more balanced distribution
+                    base_score = (complexity * 0.6 + (1 - avg_intensity) * 0.3) * 0.6
+                    
+                    # Add variability based on image statistics
+                    variance_factor = np.var(img) * 3
+                    
+                    # Add randomness for more balanced predictions
+                    random_factor = np.random.uniform(-0.3, 0.3)
+                    
+                    # Adjust the bias based on model type
+                    if self.model_type == "transfer":
+                        model_bias = 0.03 if base_score > 0.4 else -0.03
+                    else:
+                        model_bias = 0.0
+                    
+                    # Final prediction - we use a slightly different formula for more variety
+                    prediction_value = base_score + variance_factor + random_factor + model_bias
+                    
+                    # Ensure more balanced predictions by applying curve
+                    if np.random.random() > 0.7:  # 30% chance to flip from one class to another
+                        if prediction_value > 0.5:
+                            prediction_value = 0.3 + np.random.uniform(0, 0.15)
+                        else:
+                            prediction_value = 0.7 + np.random.uniform(0, 0.15)
             else:
-                # For non-sample images or if pattern matching failed
+                # For non-sample images
                 
                 # Calculate a base prediction score (0-1)
                 # This formula is adjusted to generally produce a more balanced distribution
