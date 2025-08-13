@@ -206,7 +206,7 @@ if st.session_state.show_history:
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    st.image(entry['image'], caption=f"Image {i+1}", use_column_width=True)
+                    st.image(entry['image'], caption=f"Image {i+1}", use_container_width=True)
                     
                 with col2:
                     st.write(f"**Timestamp:** {entry['timestamp']}")
@@ -272,7 +272,7 @@ elif not (st.session_state.get('show_model_comparison', False) or
             st.write(f"Selected sample: **{sample_option}**")
             sample_image = get_sample_image(sample_option)
             if sample_image:
-                st.image(sample_image, caption=f"Sample Image: {sample_option}", use_column_width=True)
+                st.image(sample_image, caption=f"Sample Image: {sample_option}", use_container_width=True)
                 use_sample = True
     
     # Process images (either uploaded or sample)
@@ -297,7 +297,7 @@ elif not (st.session_state.get('show_model_comparison', False) or
                     # Display DICOM information
                     with col1:
                         st.subheader("Original Image")
-                        st.image(pixel_array, caption="Original DICOM Image", use_column_width=True)
+                        st.image(pixel_array, caption="Original DICOM Image", use_container_width=True)
                         display_dicom_info(image_data)
                     
                     # Convert to format suitable for model
@@ -312,7 +312,7 @@ elif not (st.session_state.get('show_model_comparison', False) or
                     
                     with col1:
                         st.subheader("Original Image")
-                        st.image(image, caption=f"Original Image: {uploaded_file.name}", use_column_width=True)
+                        st.image(image, caption=f"Original Image: {uploaded_file.name}", use_container_width=True)
                     
                     # Convert to numpy array and preprocess
                     image_array = np.array(image)
@@ -326,7 +326,7 @@ elif not (st.session_state.get('show_model_comparison', False) or
                 
                 with col1:
                     st.subheader("Original Sample Image")
-                    st.image(sample_image, caption=f"Sample: {sample_option}", use_column_width=True)
+                    st.image(sample_image, caption=f"Sample: {sample_option}", use_container_width=True)
                 
                 # Ensure image has proper color channels
                 image_array = ensure_color_channels(image_array)
@@ -345,7 +345,7 @@ elif not (st.session_state.get('show_model_comparison', False) or
                     # Show the enhanced image
                     with col1:
                         st.subheader("Enhanced Image")
-                        st.image(enhanced_image, caption=f"Enhanced with {enhancement_option}", use_column_width=True)
+                        st.image(enhanced_image, caption=f"Enhanced with {enhancement_option}", use_container_width=True)
                     
                     # Use enhanced image for prediction
                     final_image = enhanced_image
