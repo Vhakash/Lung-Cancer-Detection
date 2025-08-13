@@ -232,20 +232,33 @@ if st.session_state.get('show_patient_form', False):
     st.header("Add New Patient")
     form_data = show_patient_form()
     if form_data:
-        with get_db() as db:
+        db = next(get_db())
+        try:
             create_patient(db, form_data)
+            db.commit()
             st.success("Patient created successfully!")
             st.session_state['show_patient_form'] = False
             st.session_state['show_patient_list'] = True
             st.rerun()
+        except Exception as e:
+            db.rollback()
+            st.error(f"Error creating patient: {str(e)}")
+        finally:
+            db.close()
 
 elif 'selected_patient_id' in st.session_state and st.session_state['selected_patient_id']:
-    with get_db() as db:
+    db = next(get_db())
+    try:
         show_patient_details(db, st.session_state['selected_patient_id'])
+    finally:
+        db.close()
 
 elif st.session_state.get('show_patient_list', False):
-    with get_db() as db:
+    db = next(get_db())
+    try:
         show_patient_list(db)
+    finally:
+        db.close()
 
 # Original app content
 elif not (st.session_state.get('show_model_comparison', False) or 
