@@ -1,132 +1,105 @@
-# 🫁 Lung Cancer Detection AI
+# Lung Cancer Detection AI
 
-This project is a Streamlit-based web application designed to assist in the early detection of lung cancer by analyzing medical images such as CT scans and X-rays. The application uses AI models and various image enhancement techniques to provide predictions and visualizations that can aid in diagnosis.
+An AI-powered tool for detecting potential signs of lung cancer from medical images.
 
----
+## ✨ Features
 
-## Features
+- **AI-Powered Analysis**: Utilizes deep learning models to analyze lung CT scans and X-rays
+- **Multiple Models**: Choose between Basic CNN and InceptionV3 Transfer Learning
+- **Image Enhancement**: Apply various image enhancement techniques for better analysis
+- **Visualization Tools**: View prediction confidence, activation maps, and feature maps
+- **Patient Management**: Track patient records and their scan history
+- **Model Comparison**: Compare performance metrics between different models
 
-- **Medical Image Analysis**: Upload lung CT scans or X-ray images for analysis.
-- **AI-Powered Predictions**: Detect potential signs of lung cancer with confidence scores.
-- **Visualization Tools**:
-  - Prediction Confidence
-  - Class Activation Maps
-  - Feature Maps
-- **Image Enhancement**:
-  - Contrast Enhancement
-  - Histogram Equalization
-  - Adaptive Histogram Equalization
-  - Gaussian Smoothing
-  - Edge Enhancement
-  - Sharpening
-- **Sample Images**: Test the app using preloaded sample medical images.
-- **Model Comparison**: Compare the performance of different AI models.
-- **Analysis History**: View and manage the history of analyzed images.
-
----
-
-## Installation
+## 🚀 Getting Started
 
 ### Prerequisites
-- Python 3.8 or higher
-- Required Python libraries:
-  - `streamlit`
-  - `numpy`
-  - `matplotlib`
-  - `pillow`
-  - `pydicom`
-  - `opencv-python`
-  - `seaborn`
 
-#### Steps
+- Python 3.8+
+- pip (Python package manager)
+
+### Installation
+
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/Lung-Cancer-Detection.git
-   cd Lung-Cancer-Detection
-   ```
-2. Install the required Python libraries:
-   ```bash
-   pip install streamlit numpy matplotlib pillow pydicom opencv-python seaborn
-   ```
-3. (Optional) Install additional libraries for enhanced image processing:
-   ```bash
-   pip install scikit-image
+   git clone https://github.com/yourusername/lungcancerdetection.git
+   cd lungcancerdetection/Lung Scan
    ```
 
----
-### Install dependencies
-```bash
-pip install -r requirements.txt
-```
-### Run the application
+2. Create a virtual environment (recommended):
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Running the Application
+
 ```bash
 streamlit run app.py
 ```
 
-## Usage
+## 🏥 Patient Management System
 
-1. Launch the Streamlit web application:
-    ```bash
-    streamlit run app.py
-    ```
-2. Open your web browser and go to `http://localhost:8501`.
-3. Upload your lung CT scan or X-ray image.
-4. Explore the AI-powered predictions and visualizations.
-5. (Optional) Compare different AI models and view analysis history.
+The application now includes a comprehensive patient management system that allows you to:
 
+- Create and manage patient records
+- Track patient scan history
+- View detailed analysis of each scan
+- Search and filter patient records
 
-## Usage
-1. Upload an Image: Upload a lung CT scan or X-ray image, or select a sample image from the sidebar.
-2. Select Model and Enhancements:
-        Choose an AI model (e.g., Basic CNN or InceptionV3 Transfer Learning).
-        Apply optional image enhancement techniques.
-3. Analyze the Image:
-        View predictions with confidence scores.
-        Explore visualizations such as activation maps and feature maps.
-4. Compare Models: Use the "Compare Models" button to evaluate different AI models.
-5. Manage History: View or clear the analysis history from the sidebar.
----
+### Key Components
 
-## Project Structure
+- **Patient Records**: Store patient information including name, date of birth, contact details, and medical record number
+- **Scan History**: Track all scans performed for each patient
+- **Analysis Results**: View detailed analysis including predictions and confidence scores
 
-```
-Lung-Cancer-Detection/
-├── app.py                     # Main Streamlit application
-├── model.py                   # AI model-related functions
-├── preprocessing.py           # Image preprocessing utilities
-├── visualization.py           # Visualization functions
-├── utils.py                   # Utility functions
-├── sample_data.py             # Sample image-related functions
-├── image_enhancement.py       # Image enhancement techniques
-└── requirements.txt           # Python dependencies
-```
-## Key Files
-app.py: The main application file that integrates all functionalities.
+## 🛠️ Development
 
-image_enhancement.py: Contains various image enhancement techniques such as contrast adjustment, histogram equalization, and sharpening.
+### Project Structure
 
-visualization.py: Provides tools for visualizing predictions, activation maps, and feature maps.
-model.py: Defines AI models and their loading mechanisms.
+- `app.py`: Main application file with Streamlit UI
+- `models.py`: Database models for patients and scans
+- `patient_ui.py`: UI components for patient management
+- `patient_utils.py`: Utility functions for patient operations
+- `model.py`: AI model definitions and loading
+- `preprocessing.py`: Image preprocessing utilities
+- `visualization.py`: Visualization components
+- `utils.py`: General utility functions
+- `sample_data.py`: Sample medical images for testing
+- `image_enhancement.py`: Image enhancement utilities
 
-preprocessing.py: Handles image preprocessing tasks like normalization and color channel adjustments.
+### Adding New Features
 
-utils.py: Includes utility functions for DICOM file handling, history management, and prediction confidence calculation.
----
+1. Create a new branch for your feature:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-##Image Enhancement Techniques
-The following enhancement techniques are available in the app:
+2. Make your changes and test thoroughly
 
-1. Contrast Enhancement: Improves the contrast of the image.
-2. Histogram Equalization: Enhances the image by redistributing pixel intensities.
-3. Adaptive Histogram Equalization: Applies localized histogram equalization for better contrast.
-4. Gaussian Smoothing: Reduces noise and smoothens the image.
-5. Edge Enhancement: Highlights edges in the image for better feature visibility.
-6. Sharpening: Enhances the sharpness of the image.
+3. Commit your changes:
+   ```bash
+   git add .
+   git commit -m "Add your feature description"
+   ```
 
-## License
+4. Push to the branch:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
 
-This project is licensed under the MIT License.
+5. Open a pull request
 
-## Disclaimer
+## 📄 License
 
-This tool is for research and educational purposes only. It is not intended for clinical use.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Thanks to all contributors who have helped improve this project
+- Built with ❤️ using Streamlit and TensorFlow
