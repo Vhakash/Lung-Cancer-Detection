@@ -14,7 +14,7 @@ from patient_utils import create_patient, update_patient
 
 # Import our functionality from module files
 from model import MockModel, create_model, load_pretrained_model
-from preprocessing import preprocess_image, ensure_color_channels
+from preprocessing import preprocess_image, ensure_color_channels, normalize_dicom_pixel_array
 from visualization import visualize_prediction, visualize_model_performance, visualize_activation_maps, visualize_feature_maps
 from utils import read_dicom_file, display_dicom_info, calculate_prediction_confidence, add_to_history, get_analysis_history, clear_analysis_history, compare_model_performances, initialize_analysis_history
 from sample_data import get_sample_image, get_sample_image_names
@@ -313,8 +313,19 @@ elif not (st.session_state.get('show_model_comparison', False) or
                         st.image(pixel_array, caption="Original DICOM Image", use_container_width=True)
                         display_dicom_info(image_data)
                     
+                    # Apply windowing/normalization for better visualization & model input
+                    with col1:
+                        st.subheader("Windowed/Normalized DICOM")
+                        normalized_pixel_array = normalize_dicom_pixel_array(
+                            pixel_array,
+                            window_percentiles=(5, 95),
+                            apply_clahe=True
+                        )
+                        st.image(normalized_pixel_array, caption="Windowed/Normalized DICOM Image", use_container_width=True)
+                    
                     # Convert to format suitable for model
-                    processed_image = preprocess_image(pixel_array)
+                    image_array = ensure_color_channels(normalized_pixel_array)
+                    processed_image = preprocess_image(image_array)
                     
                     # Clean up the temp file
                     os.unlink(temp_file_path)
