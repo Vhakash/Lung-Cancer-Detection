@@ -153,6 +153,27 @@ else:
         st.session_state.show_history = False
         st.session_state['show_patient_list'] = False
 
+# About page
+if nav == "About":
+    st.header("About This App")
+    st.markdown(
+        """
+        This Streamlit application demonstrates an end-to-end workflow for lung cancer scan analysis:
+        
+        - Upload and preprocess DICOM and image files with medical-grade windowing.
+        - Run predictions with selectable models (currently mocked for demo).
+        - Visualize results using confidence gauges, activation maps, and feature maps.
+        - Manage patients and persist scan analyses to a database with image storage.
+        
+        Roadmap:
+        - Integrate real trained models (TensorFlow/PyTorch) with Grad-CAM.
+        - Batch analysis and 3D series support.
+        - Exportable PDF/CSV reports and audit logging.
+        """
+    )
+    st.info("Use the sidebar Navigation to switch to Analyze, Patients, History, or Compare Models.")
+    st.stop()
+
 # Add Patient Management to sidebar
 st.sidebar.markdown("## 👥 Patient Management")
 if st.sidebar.button("View All Patients"):
@@ -428,100 +449,93 @@ elif not (st.session_state.get('show_model_comparison', False) or
                     enhancement_option if enhancement_option != "None" else None
                 )
                 
-                # Display results
+                # Display results & actions (tabs for cleaner UI)
                 with col2:
-                    st.subheader("Analysis Results")
-                    
-                    # Classification result
+                    results_tab, viz_tab, save_tab = st.tabs(["Results", "Visualizations", "Save"])
+
+                    # Compute classification
                     label, confidence = calculate_prediction_confidence(prediction[0][0])
-                    
-                    # Style the result display
-                    if label == "Cancer":
-                        st.error(f"**Prediction: {label}** (Confidence: {confidence:.2f}%)")
-                    else:
-                        st.success(f"**Prediction: {label}** (Confidence: {confidence:.2f}%)")
-                    
-                    st.write(f"Processing time: {processing_time:.2f} ms")
-                    
-                    # Display visualizations based on selected option
-                    if visualization_option == "Prediction Confidence":
-                        visualize_prediction(prediction[0][0])
-                    elif visualization_option == "Class Activation Maps":
-                        visualize_activation_maps(final_image, st.session_state.model)
-                    elif visualization_option == "Feature Maps":
-                        visualize_feature_maps(final_image, st.session_state.model)
-                    
-                    # Display model performance metrics
-                    st.subheader("Model Performance")
-                    visualize_model_performance(model_option)
-                    
-                    # Save analysis to patient record
-                    st.divider()
-                    st.subheader("Save Analysis")
-                    
-                    # Fetch patients for selection
-                    patient_options = [(None, "-- Select patient --")]
-                    db = next(get_db())
-                    try:
-                        pts = get_patients(db)
-                        patient_options.extend([(p.id, f"{p.last_name}, {p.first_name} (MRN: {p.medical_record_number})") for p in pts])
-                    finally:
-                        db.close()
-                    id_to_label = {pid: label for pid, label in patient_options}
-                    labels = [label for _, label in patient_options]
-                    selected_label = st.selectbox("Assign to patient", options=labels, index=0, key="assign_patient_select")
-                    # Reverse lookup selected id
-                    selected_patient_id = None
-                    for pid, lbl in id_to_label.items():
-                        if lbl == selected_label:
-                            selected_patient_id = pid
-                            break
-                    
-                    notes = st.text_area("Notes", placeholder="Optional notes about this analysis")
-                    
-                    if st.button("Save to Patient Record", key="save_scan_btn"):
-                        if not selected_patient_id:
-                            st.warning("Please select a patient to save the analysis.")
+
+                    with results_tab:
+                        st.subheader("Analysis Results")
+                        if label == "Cancer":
+                            st.error(f"**Prediction: {label}** (Confidence: {confidence:.2f}%)")
                         else:
-                            # Prepare image to save
-                            img_to_save = (final_image * 255).clip(0, 255).astype(np.uint8)
-                            # Ensure 3 channels for PNG
-                            if img_to_save.ndim == 2:
-                                img_to_save = np.stack([img_to_save]*3, axis=-1)
-                            save_name = f"scan_{uuid.uuid4().hex[:8]}.png"
-                            save_path = os.path.join('instance', 'uploads', save_name)
-                            Image.fromarray(img_to_save).save(save_path)
-                            
-                            # Determine scan metadata
-                            if 'uploaded_file' in locals() and uploaded_file is not None:
-                                original_filename = uploaded_file.name
-                                scan_type = 'DICOM' if uploaded_file.name.lower().endswith('.dcm') else 'Image'
-                            elif use_sample:
-                                original_filename = f"{sample_option}.png"
-                                scan_type = 'Sample'
+                            st.success(f"**Prediction: {label}** (Confidence: {confidence:.2f}%)")
+                        st.write(f"Processing time: {processing_time:.2f} ms")
+                        visualize_prediction(prediction[0][0])
+
+                    with viz_tab:
+                        st.subheader("Visualizations")
+                        if visualization_option == "Class Activation Maps":
+                            visualize_activation_maps(final_image, st.session_state.model)
+                        elif visualization_option == "Feature Maps":
+                            visualize_feature_maps(final_image, st.session_state.model)
+                        else:
+                            st.info("Use the sidebar to choose a visualization.")
+                        st.subheader("Model Performance")
+                        visualize_model_performance(model_option)
+
+                    with save_tab:
+                        st.subheader("Save Analysis")
+                        # Fetch patients for selection
+                        patient_options = [(None, "-- Select patient --")]
+                        db = next(get_db())
+                        try:
+                            pts = get_patients(db)
+                            patient_options.extend([(p.id, f"{p.last_name}, {p.first_name} (MRN: {p.medical_record_number})") for p in pts])
+                        finally:
+                            db.close()
+                        id_to_label = {pid: label for pid, label in patient_options}
+                        labels = [label for _, label in patient_options]
+                        selected_label = st.selectbox("Assign to patient", options=labels, index=0, key="assign_patient_select")
+                        # Reverse lookup selected id
+                        selected_patient_id = None
+                        for pid, lbl in id_to_label.items():
+                            if lbl == selected_label:
+                                selected_patient_id = pid
+                                break
+                        notes = st.text_area("Notes", placeholder="Optional notes about this analysis")
+                        if st.button("Save to Patient Record", key="save_scan_btn"):
+                            if not selected_patient_id:
+                                st.warning("Please select a patient to save the analysis.")
                             else:
-                                original_filename = save_name
-                                scan_type = 'Image'
-                            
-                            # Persist to DB
-                            db = next(get_db())
-                            try:
-                                scan_record = add_scan_to_patient(db, selected_patient_id, {
-                                    'scan_type': scan_type,
-                                    'file_path': save_path,
-                                    'original_filename': original_filename,
-                                    'notes': notes
-                                })
-                                update_scan_results(db, scan_record.id, {
-                                    'prediction': label,
-                                    'confidence': float(confidence),
-                                    'findings': notes
-                                })
-                                st.success("Analysis saved to patient record.")
-                            except Exception as e:
-                                st.error(f"Failed to save analysis: {e}")
-                            finally:
-                                db.close()
+                                # Prepare image to save
+                                img_to_save = (final_image * 255).clip(0, 255).astype(np.uint8)
+                                if img_to_save.ndim == 2:
+                                    img_to_save = np.stack([img_to_save]*3, axis=-1)
+                                save_name = f"scan_{uuid.uuid4().hex[:8]}.png"
+                                save_path = os.path.join('instance', 'uploads', save_name)
+                                Image.fromarray(img_to_save).save(save_path)
+                                # Determine scan metadata
+                                if 'uploaded_file' in locals() and uploaded_file is not None:
+                                    original_filename = uploaded_file.name
+                                    scan_type = 'DICOM' if uploaded_file.name.lower().endswith('.dcm') else 'Image'
+                                elif use_sample:
+                                    original_filename = f"{sample_option}.png"
+                                    scan_type = 'Sample'
+                                else:
+                                    original_filename = save_name
+                                    scan_type = 'Image'
+                                # Persist to DB
+                                db = next(get_db())
+                                try:
+                                    scan_record = add_scan_to_patient(db, selected_patient_id, {
+                                        'scan_type': scan_type,
+                                        'file_path': save_path,
+                                        'original_filename': original_filename,
+                                        'notes': notes
+                                    })
+                                    update_scan_results(db, scan_record.id, {
+                                        'prediction': label,
+                                        'confidence': float(confidence),
+                                        'findings': notes
+                                    })
+                                    st.success("Analysis saved to patient record.")
+                                except Exception as e:
+                                    st.error(f"Failed to save analysis: {e}")
+                                finally:
+                                    db.close()
         
         except Exception as e:
             st.error(f"Error processing image: {str(e)}")
