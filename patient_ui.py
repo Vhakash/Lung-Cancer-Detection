@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from models import Patient, Scan, get_db
 from patient_utils import *
+import os
 
 def show_patient_form(patient: Optional[Patient] = None) -> Dict[str, Any]:
     """Render patient form and return form data"""
@@ -94,6 +95,9 @@ def show_patient_details(db: Session, patient_id: int):
     if scans:
         for scan in scans:
             with st.expander(f"{scan.scan_date.strftime('%Y-%m-%d %H:%M')} - {scan.scan_type or 'Unknown'}"):
+                # Show image thumbnail if available
+                if scan.file_path and os.path.exists(scan.file_path):
+                    st.image(scan.file_path, caption=os.path.basename(scan.file_path), use_container_width=True)
                 st.write(f"**Prediction:** {scan.prediction or 'N/A'}")
                 st.write(f"**Confidence:** {f'{scan.confidence:.2f}%' if scan.confidence else 'N/A'}")
                 st.write(f"**Notes:** {scan.notes or 'No notes'}")

@@ -8,9 +8,10 @@ import pydicom
 import io
 import time
 import random
+import uuid
 from patient_ui import show_patient_form, show_patient_list, show_patient_details
 from models import get_db, Patient
-from patient_utils import create_patient, update_patient
+from patient_utils import create_patient, update_patient, get_patients, add_scan_to_patient, update_scan_results
 
 # Import our functionality from module files
 from model import MockModel, create_model, load_pretrained_model
@@ -29,6 +30,10 @@ st.set_page_config(
     page_icon="🫁",
     layout="wide"
 )
+
+# Ensure required directories exist
+os.makedirs('instance', exist_ok=True)
+os.makedirs('instance/uploads', exist_ok=True)
 
 # Application title and description with a more creative design
 st.markdown("""
@@ -118,6 +123,35 @@ if st.sidebar.button("Clear History", key="clear_history_button"):
     st.sidebar.success("Analysis history cleared!")
     if 'show_history' in st.session_state:
         st.session_state.show_history = False
+
+# Navigation
+st.sidebar.markdown("## 🧭 Navigation")
+nav = st.sidebar.radio(
+    "Go to",
+    ["Analyze", "Patients", "History", "Compare Models", "About"],
+    index=0,
+    key="nav_radio"
+)
+
+# Apply navigation state overrides
+if nav == "Compare Models":
+    st.session_state.show_model_comparison = True
+    st.session_state.show_history = False
+    st.session_state['show_patient_list'] = False
+elif nav == "History":
+    st.session_state.show_model_comparison = False
+    st.session_state.show_history = True
+    st.session_state['show_patient_list'] = False
+elif nav == "Patients":
+    st.session_state.show_model_comparison = False
+    st.session_state.show_history = False
+    st.session_state['show_patient_list'] = True
+else:
+    # Analyze / About fall back to main view unless About
+    if nav == "About":
+        st.session_state.show_model_comparison = False
+        st.session_state.show_history = False
+        st.session_state['show_patient_list'] = False
 
 # Add Patient Management to sidebar
 st.sidebar.markdown("## 👥 Patient Management")
@@ -421,6 +455,74 @@ elif not (st.session_state.get('show_model_comparison', False) or
                     st.subheader("Model Performance")
                     visualize_model_performance(model_option)
                     
+                    # Save analysis to patient record
+                    st.divider()
+                    st.subheader("Save Analysis")
+                    
+                    # Fetch patients for selection
+                    patient_options = [(None, "-- Select patient --")]
+                    db = next(get_db())
+                    try:
+                        pts = get_patients(db)
+                        patient_options.extend([(p.id, f"{p.last_name}, {p.first_name} (MRN: {p.medical_record_number})") for p in pts])
+                    finally:
+                        db.close()
+                    id_to_label = {pid: label for pid, label in patient_options}
+                    labels = [label for _, label in patient_options]
+                    selected_label = st.selectbox("Assign to patient", options=labels, index=0, key="assign_patient_select")
+                    # Reverse lookup selected id
+                    selected_patient_id = None
+                    for pid, lbl in id_to_label.items():
+                        if lbl == selected_label:
+                            selected_patient_id = pid
+                            break
+                    
+                    notes = st.text_area("Notes", placeholder="Optional notes about this analysis")
+                    
+                    if st.button("Save to Patient Record", key="save_scan_btn"):
+                        if not selected_patient_id:
+                            st.warning("Please select a patient to save the analysis.")
+                        else:
+                            # Prepare image to save
+                            img_to_save = (final_image * 255).clip(0, 255).astype(np.uint8)
+                            # Ensure 3 channels for PNG
+                            if img_to_save.ndim == 2:
+                                img_to_save = np.stack([img_to_save]*3, axis=-1)
+                            save_name = f"scan_{uuid.uuid4().hex[:8]}.png"
+                            save_path = os.path.join('instance', 'uploads', save_name)
+                            Image.fromarray(img_to_save).save(save_path)
+                            
+                            # Determine scan metadata
+                            if 'uploaded_file' in locals() and uploaded_file is not None:
+                                original_filename = uploaded_file.name
+                                scan_type = 'DICOM' if uploaded_file.name.lower().endswith('.dcm') else 'Image'
+                            elif use_sample:
+                                original_filename = f"{sample_option}.png"
+                                scan_type = 'Sample'
+                            else:
+                                original_filename = save_name
+                                scan_type = 'Image'
+                            
+                            # Persist to DB
+                            db = next(get_db())
+                            try:
+                                scan_record = add_scan_to_patient(db, selected_patient_id, {
+                                    'scan_type': scan_type,
+                                    'file_path': save_path,
+                                    'original_filename': original_filename,
+                                    'notes': notes
+                                })
+                                update_scan_results(db, scan_record.id, {
+                                    'prediction': label,
+                                    'confidence': float(confidence),
+                                    'findings': notes
+                                })
+                                st.success("Analysis saved to patient record.")
+                            except Exception as e:
+                                st.error(f"Failed to save analysis: {e}")
+                            finally:
+                                db.close()
+        
         except Exception as e:
             st.error(f"Error processing image: {str(e)}")
             st.write("Please try another image or check the file format.")
