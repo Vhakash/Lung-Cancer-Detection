@@ -486,6 +486,17 @@ elif not (st.session_state.get('show_model_comparison', False) or
                             patient_options.extend([(p.id, f"{p.last_name}, {p.first_name} (MRN: {p.medical_record_number})") for p in pts])
                         finally:
                             db.close()
+                        # Empty-state: no patients
+                        if not pts:
+                            st.info("No patients found. Create a patient to save this analysis.")
+                            if st.button("Add New Patient", key="save_tab_add_patient"):
+                                st.session_state['show_patient_list'] = True
+                                # Switch nav to Patients
+                                st.session_state['nav_radio'] = "Patients"
+                                st.rerun()
+                            # Early exit from save tab when no patients
+                            st.stop()
+
                         id_to_label = {pid: label for pid, label in patient_options}
                         labels = [label for _, label in patient_options]
                         selected_label = st.selectbox("Assign to patient", options=labels, index=0, key="assign_patient_select")
@@ -532,6 +543,12 @@ elif not (st.session_state.get('show_model_comparison', False) or
                                         'findings': notes
                                     })
                                     st.success("Analysis saved to patient record.")
+                                    # Offer to view patient details immediately
+                                    if st.button("View Patient", key="view_saved_patient_btn"):
+                                        st.session_state['selected_patient_id'] = selected_patient_id
+                                        st.session_state['show_patient_list'] = True
+                                        st.session_state['nav_radio'] = "Patients"
+                                        st.rerun()
                                 except Exception as e:
                                     st.error(f"Failed to save analysis: {e}")
                                 finally:
