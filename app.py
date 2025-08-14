@@ -487,72 +487,72 @@ elif not (st.session_state.get('show_model_comparison', False) or
                         finally:
                             db.close()
                         # Empty-state: no patients
-                        if not pts:
+                        has_patients = bool(pts)
+                        if not has_patients:
                             st.info("No patients found. Create a patient to save this analysis.")
                             if st.button("Add New Patient", key="save_tab_add_patient"):
                                 st.session_state['show_patient_list'] = True
-                                # Switch nav to Patients
                                 st.session_state['nav_radio'] = "Patients"
                                 st.rerun()
-                            # Early exit from save tab when no patients
-                            st.stop()
-
-                        id_to_label = {pid: label for pid, label in patient_options}
-                        labels = [label for _, label in patient_options]
-                        selected_label = st.selectbox("Assign to patient", options=labels, index=0, key="assign_patient_select")
-                        # Reverse lookup selected id
-                        selected_patient_id = None
-                        for pid, lbl in id_to_label.items():
-                            if lbl == selected_label:
-                                selected_patient_id = pid
-                                break
-                        notes = st.text_area("Notes", placeholder="Optional notes about this analysis")
-                        if st.button("Save to Patient Record", key="save_scan_btn"):
-                            if not selected_patient_id:
-                                st.warning("Please select a patient to save the analysis.")
-                            else:
-                                # Prepare image to save
-                                img_to_save = (final_image * 255).clip(0, 255).astype(np.uint8)
-                                if img_to_save.ndim == 2:
-                                    img_to_save = np.stack([img_to_save]*3, axis=-1)
-                                save_name = f"scan_{uuid.uuid4().hex[:8]}.png"
-                                save_path = os.path.join('instance', 'uploads', save_name)
-                                Image.fromarray(img_to_save).save(save_path)
-                                # Determine scan metadata
-                                if 'uploaded_file' in locals() and uploaded_file is not None:
-                                    original_filename = uploaded_file.name
-                                    scan_type = 'DICOM' if uploaded_file.name.lower().endswith('.dcm') else 'Image'
-                                elif use_sample:
-                                    original_filename = f"{sample_option}.png"
-                                    scan_type = 'Sample'
+                            # Do not render further Save UI when no patients
+                            st.caption("Create a patient to enable saving.")
+                        if has_patients:
+                            id_to_label = {pid: label for pid, label in patient_options}
+                            labels = [label for _, label in patient_options]
+                            selected_label = st.selectbox("Assign to patient", options=labels, index=0, key="assign_patient_select")
+                            # Reverse lookup selected id
+                            selected_patient_id = None
+                            for pid, lbl in id_to_label.items():
+                                if lbl == selected_label:
+                                    selected_patient_id = pid
+                                    break
+                            notes = st.text_area("Notes", placeholder="Optional notes about this analysis")
+                            if st.button("Save to Patient Record", key="save_scan_btn"):
+                                if not selected_patient_id:
+                                    st.warning("Please select a patient to save the analysis.")
                                 else:
-                                    original_filename = save_name
-                                    scan_type = 'Image'
-                                # Persist to DB
-                                db = next(get_db())
-                                try:
-                                    scan_record = add_scan_to_patient(db, selected_patient_id, {
-                                        'scan_type': scan_type,
-                                        'file_path': save_path,
-                                        'original_filename': original_filename,
-                                        'notes': notes
-                                    })
-                                    update_scan_results(db, scan_record.id, {
-                                        'prediction': label,
-                                        'confidence': float(confidence),
-                                        'findings': notes
-                                    })
-                                    st.success("Analysis saved to patient record.")
-                                    # Offer to view patient details immediately
-                                    if st.button("View Patient", key="view_saved_patient_btn"):
-                                        st.session_state['selected_patient_id'] = selected_patient_id
-                                        st.session_state['show_patient_list'] = True
-                                        st.session_state['nav_radio'] = "Patients"
-                                        st.rerun()
-                                except Exception as e:
-                                    st.error(f"Failed to save analysis: {e}")
-                                finally:
-                                    db.close()
+                                    # Prepare image to save
+                                    img_to_save = (final_image * 255).clip(0, 255).astype(np.uint8)
+                                    if img_to_save.ndim == 2:
+                                        img_to_save = np.stack([img_to_save]*3, axis=-1)
+                                    save_name = f"scan_{uuid.uuid4().hex[:8]}.png"
+                                    save_path = os.path.join('instance', 'uploads', save_name)
+                                    Image.fromarray(img_to_save).save(save_path)
+                                    # Determine scan metadata
+                                    if 'uploaded_file' in locals() and uploaded_file is not None:
+                                        original_filename = uploaded_file.name
+                                        scan_type = 'DICOM' if uploaded_file.name.lower().endswith('.dcm') else 'Image'
+                                    elif use_sample:
+                                        original_filename = f"{sample_option}.png"
+                                        scan_type = 'Sample'
+                                    else:
+                                        original_filename = save_name
+                                        scan_type = 'Image'
+                                    # Persist to DB
+                                    db = next(get_db())
+                                    try:
+                                        scan_record = add_scan_to_patient(db, selected_patient_id, {
+                                            'scan_type': scan_type,
+                                            'file_path': save_path,
+                                            'original_filename': original_filename,
+                                            'notes': notes
+                                        })
+                                        update_scan_results(db, scan_record.id, {
+                                            'prediction': label,
+                                            'confidence': float(confidence),
+                                            'findings': notes
+                                        })
+                                        st.success("Analysis saved to patient record.")
+                                        # Offer to view patient details immediately
+                                        if st.button("View Patient", key="view_saved_patient_btn"):
+                                            st.session_state['selected_patient_id'] = selected_patient_id
+                                            st.session_state['show_patient_list'] = True
+                                            st.session_state['nav_radio'] = "Patients"
+                                            st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Failed to save analysis: {e}")
+                                    finally:
+                                        db.close()
         
         except Exception as e:
             st.error(f"Error processing image: {str(e)}")
