@@ -10,7 +10,7 @@ import time
 import random
 import uuid
 from patient_ui import show_patient_form, show_patient_list, show_patient_details
-from models import get_db, Patient
+from models import get_db, Patient, Scan
 from patient_utils import create_patient, update_patient, get_patients, add_scan_to_patient, update_scan_results
 
 # Import our functionality from module files
@@ -242,46 +242,80 @@ if st.session_state.show_model_comparison:
         st.session_state.show_model_comparison = False
         st.rerun()
 
-# History View
-if st.session_state.show_history:
+# DB-backed History view: When nav == "History" or show_history flag is set, list recent scans
+# with filters and actions to jump to patient details.
+if st.session_state.get('show_history') or ("nav_radio" in st.session_state and st.session_state['nav_radio'] == "History"):
     st.subheader("Analysis History")
-    
-    # Get history
-    history = get_analysis_history()
-    
-    if not history:
-        st.info("No analysis history available. Analyze some images to build history.")
+
+    # Filters
+    colf1, colf2, colf3 = st.columns([2, 1, 1])
+    with colf1:
+        name_filter = st.text_input("Search by patient name")
+    with colf2:
+        pred_filter = st.selectbox("Prediction", ["All", "Cancer", "No Cancer"], index=0)
+    with colf3:
+        limit = st.selectbox("Show", [20, 50, 100], index=0)
+
+    db = next(get_db())
+    try:
+        q = db.query(Scan).order_by(Scan.scan_date.desc()).limit(limit)
+        scans = q.all()
+    except Exception as e:
+        st.error(f"Failed to load history: {e}")
+        scans = []
+    finally:
+        db.close()
+
+    # Apply client-side filters (name/prediction)
+    def match_name(p):
+        if not name_filter:
+            return True
+        full = f"{p.last_name}, {p.first_name}".lower()
+        return name_filter.lower() in full
+
+    # Build rows with patient info
+    rows = []
+    if scans:
+        db = next(get_db())
+        try:
+            for s in scans:
+                patient = db.query(Patient).filter(Patient.id == s.patient_id).first() if s.patient_id else None
+                label = s.prediction or "N/A"
+                if pred_filter != "All" and label != pred_filter:
+                    continue
+                if patient and not match_name(patient):
+                    continue
+                rows.append((s, patient))
+        finally:
+            db.close()
+
+    if not rows:
+        st.info("No analyses found.")
     else:
-        # Create tabs for each history entry
-        tab_labels = [f"Analysis {i+1} - {h['timestamp']}" for i, h in enumerate(history)]
-        tabs = st.tabs(tab_labels)
-        
-        for i, (tab, entry) in enumerate(zip(tabs, history)):
-            with tab:
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.image(entry['image'], caption=f"Image {i+1}", use_container_width=True)
-                    
-                with col2:
-                    st.write(f"**Timestamp:** {entry['timestamp']}")
-                    st.write(f"**Model:** {entry['model_type']}")
-                    
-                    # Display enhancement info if available
-                    if entry['enhancement']:
-                        st.write(f"**Enhancement:** {entry['enhancement']}")
-                    
-                    # Display prediction result
-                    if entry['prediction_label'] == 'Cancer':
-                        st.error(f"**Prediction:** {entry['prediction_label']} (Confidence: {entry['confidence']:.2f}%)")
+        for s, patient in rows:
+            with st.container():
+                c1, c2, c3, c4 = st.columns([1, 2, 2, 1])
+                with c1:
+                    # Thumbnail if file exists
+                    if s.file_path and os.path.exists(s.file_path):
+                        st.image(s.file_path, use_container_width=True)
                     else:
-                        st.success(f"**Prediction:** {entry['prediction_label']} (Confidence: {entry['confidence']:.2f}%)")
-        
-        # Button to close history view
-        if st.button("Close History View", key="close_history_view"):
-            st.session_state.show_history = False
-            st.rerun()
-            
+                        st.caption("No image")
+                with c2:
+                    st.write(f"**Patient:** {patient.first_name} {patient.last_name}" if patient else "**Patient:** Unknown")
+                    st.write(f"**Date:** {s.scan_date.strftime('%Y-%m-%d %H:%M') if s.scan_date else 'N/A'}")
+                with c3:
+                    st.write(f"**Prediction:** {s.prediction or 'N/A'}")
+                    st.write(f"**Confidence:** {f'{s.confidence:.2f}%' if s.confidence is not None else 'N/A'}")
+                    if s.notes:
+                        st.caption(s.notes)
+                with c4:
+                    if patient and st.button("View", key=f"view_patient_{s.id}"):
+                        st.session_state['selected_patient_id'] = patient.id
+                        st.session_state['show_patient_list'] = True
+                        st.session_state['nav_radio'] = "Patients"
+                        st.rerun()
+
 # Main content area
 if st.session_state.get('show_patient_form', False):
     st.header("Add New Patient")
