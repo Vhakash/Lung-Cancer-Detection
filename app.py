@@ -490,12 +490,50 @@ elif not (st.session_state.get('show_model_comparison', False) or
                         has_patients = bool(pts)
                         if not has_patients:
                             st.info("No patients found. Create a patient to save this analysis.")
+                        
+                        # Inline create patient form
+                        with st.expander("➕ Create New Patient", expanded=not has_patients):
+                            with st.form(key="inline_create_patient_form"):
+                                c1, c2 = st.columns(2)
+                                with c1:
+                                    new_first = st.text_input("First Name")
+                                    new_dob = st.date_input("Date of Birth")
+                                    new_email = st.text_input("Email", placeholder="name@example.com")
+                                with c2:
+                                    new_last = st.text_input("Last Name")
+                                    new_gender = st.selectbox("Gender", ["", "Male", "Female", "Other"], index=0)
+                                    new_phone = st.text_input("Phone", placeholder="+1-555-123-4567")
+                                submitted = st.form_submit_button("Create Patient")
+                                if submitted:
+                                    if not new_first or not new_last or not new_dob or not new_gender:
+                                        st.warning("Please fill First/Last Name, Date of Birth, and Gender.")
+                                    else:
+                                        db = next(get_db())
+                                        try:
+                                            create_patient(db, {
+                                                'first_name': new_first,
+                                                'last_name': new_last,
+                                                'date_of_birth': new_dob,
+                                                'gender': new_gender,
+                                                'email': new_email,
+                                                'phone': new_phone
+                                            })
+                                            st.success("Patient created.")
+                                            # Rerun to refresh patient list
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Failed to create patient: {e}")
+                                        finally:
+                                            db.close()
+                        
+                        if not has_patients:
                             if st.button("Add New Patient", key="save_tab_add_patient"):
                                 st.session_state['show_patient_list'] = True
                                 st.session_state['nav_radio'] = "Patients"
                                 st.rerun()
                             # Do not render further Save UI when no patients
                             st.caption("Create a patient to enable saving.")
+                        
                         if has_patients:
                             id_to_label = {pid: label for pid, label in patient_options}
                             labels = [label for _, label in patient_options]
