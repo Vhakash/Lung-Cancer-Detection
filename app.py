@@ -499,6 +499,68 @@ elif not (st.session_state.get('show_model_comparison', False) or
                         st.write(f"Processing time: {processing_time:.2f} ms")
                         visualize_prediction(prediction[0][0])
 
+                        # Downloadable report and image
+                        st.markdown("---")
+                        st.subheader("Download Report")
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        report = {
+                            'timestamp': timestamp,
+                            'model': model_option,
+                            'prediction': label,
+                            'confidence_percent': round(float(confidence), 2),
+                            'processing_time_ms': round(float(processing_time), 2),
+                            'enhancement': enhancement_option if enhancement_option != "None" else "None",
+                            'visualization': visualization_option,
+                        }
+                        # CSV bytes
+                        try:
+                            import pandas as pd
+                            csv_bytes = pd.DataFrame([report]).to_csv(index=False).encode('utf-8')
+                        except Exception:
+                            # Fallback minimal CSV
+                            csv_bytes = ("timestamp,model,prediction,confidence_percent,processing_time_ms,enhancement,visualization\n" +
+                                         f"{report['timestamp']},{report['model']},{report['prediction']},{report['confidence_percent']},{report['processing_time_ms']},{report['enhancement']},{report['visualization']}\n").encode('utf-8')
+
+                        # Image bytes (PNG) from final_image (0..1 float)
+                        img_arr = (final_image * 255).clip(0, 255).astype(np.uint8)
+                        if img_arr.ndim == 2:
+                            img_arr = np.stack([img_arr]*3, axis=-1)
+                        img_buf = io.BytesIO()
+                        Image.fromarray(img_arr).save(img_buf, format='PNG')
+                        img_buf.seek(0)
+
+                        col_dl1, col_dl2, col_dl3 = st.columns(3)
+                        with col_dl1:
+                            st.download_button(
+                                label="Download CSV Report",
+                                data=csv_bytes,
+                                file_name=f"analysis_report_{timestamp}.csv",
+                                mime="text/csv",
+                                key="dl_csv_report"
+                            )
+                        with col_dl2:
+                            st.download_button(
+                                label="Download Image PNG",
+                                data=img_buf.getvalue(),
+                                file_name=f"analysis_image_{timestamp}.png",
+                                mime="image/png",
+                                key="dl_png_image"
+                            )
+                        with col_dl3:
+                            # ZIP bundle
+                            zip_buf = io.BytesIO()
+                            with zipfile.ZipFile(zip_buf, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
+                                zf.writestr(f"analysis_report_{timestamp}.csv", csv_bytes)
+                                zf.writestr(f"analysis_image_{timestamp}.png", img_buf.getvalue())
+                            zip_buf.seek(0)
+                            st.download_button(
+                                label="Download ZIP Bundle",
+                                data=zip_buf.getvalue(),
+                                file_name=f"analysis_{timestamp}.zip",
+                                mime="application/zip",
+                                key="dl_zip_bundle"
+                            )
+
                     with viz_tab:
                         st.subheader("Visualizations")
                         if visualization_option == "Class Activation Maps":
