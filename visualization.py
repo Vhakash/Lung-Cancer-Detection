@@ -123,41 +123,39 @@ def visualize_activation_maps(image, model):
         image (numpy.ndarray): Input image (preprocessed)
         model (object): The CNN model (with get_activation_map method)
     """
-    # Get activation map from the model
-    activation_map = model.get_activation_map(image)
-    
-    # Create a figure for visualization
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
-    
-    # Plot original image
-    ax1.imshow(image)
-    ax1.set_title('Original Image')
-    ax1.axis('off')
-    
-    # Plot activation map
-    ax2.imshow(activation_map, cmap='jet')
-    ax2.set_title('Activation Map')
-    ax2.axis('off')
-    
-    # Plot overlay
-    ax3.imshow(image)
-    overlay = ax3.imshow(activation_map, cmap='jet', alpha=0.6)
-    ax3.set_title('Overlay')
-    ax3.axis('off')
-    
-    # Add colorbar
-    cbar = fig.colorbar(overlay, ax=ax3)
-    cbar.set_label('Activation Intensity')
-    
-    st.pyplot(fig)
-    
-    # Add explanation
-    st.write("""
+    # If model provides a mock activation map API, use it
+    if hasattr(model, 'get_activation_map'):
+        activation_map = model.get_activation_map(image)
+        # Create a figure for visualization
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
+        ax1.imshow(image)
+        ax1.set_title('Original Image')
+        ax1.axis('off')
+        ax2.imshow(activation_map, cmap='jet')
+        ax2.set_title('Activation Map')
+        ax2.axis('off')
+        ax3.imshow(image)
+        overlay = ax3.imshow(activation_map, cmap='jet', alpha=0.6)
+        ax3.set_title('Overlay')
+        ax3.axis('off')
+        cbar = fig.colorbar(overlay, ax=ax3)
+        cbar.set_label('Activation Intensity')
+        st.pyplot(fig)
+        st.write("""
     **Class Activation Map Interpretation:**
     - Bright red/yellow areas indicate regions most influential for the model's decision.
     - These highlighted areas often correspond to abnormal tissue patterns.
     - The overlay shows how these regions align with the original image features.
     """)
+        return
+    
+    # Otherwise, if this looks like a Keras model, defer to Grad-CAM
+    if hasattr(model, 'layers') and hasattr(model, 'inputs') and hasattr(model, 'outputs'):
+        st.info("Model does not expose activation-map API. Using Grad-CAM instead.")
+        return visualize_grad_cam(image, model)
+    
+    # Fallback: cannot compute
+    st.warning("Unable to compute activation maps for this model type.")
 
 def visualize_feature_maps(image, model, layer_index=1):
     """Visualize feature maps from a specific CNN layer.
@@ -167,42 +165,83 @@ def visualize_feature_maps(image, model, layer_index=1):
         model (object): The CNN model (with get_feature_maps method)
         layer_index (int): Index of the layer to visualize
     """
-    # Get feature maps from the model
-    feature_maps = model.get_feature_maps(image, layer_index)
-    
-    # Select a subset of feature maps to display (max 8)
-    num_maps = min(8, feature_maps.shape[2])
-    
-    # Create figure for visualization
-    fig, axes = plt.subplots(2, 4, figsize=(12, 6))
-    axes = axes.flatten()
-    
-    # Plot each feature map
-    for i in range(num_maps):
-        feature_map = feature_maps[:, :, i]
-        
-        # Normalize for better visualization
-        feature_map = (feature_map - feature_map.min()) / (feature_map.max() - feature_map.min() + 1e-8)
-        
-        axes[i].imshow(feature_map, cmap='viridis')
-        axes[i].set_title(f'Feature Map {i+1}')
-        axes[i].axis('off')
-    
-    # Hide empty subplots if any
-    for i in range(num_maps, len(axes)):
-        fig.delaxes(axes[i])
-    
-    plt.tight_layout()
-    st.pyplot(fig)
-    
-    # Add explanation
-    st.write("""
+    # If model provides a mock feature map API, use it
+    if hasattr(model, 'get_feature_maps'):
+        feature_maps = model.get_feature_maps(image, layer_index)
+        num_maps = min(8, feature_maps.shape[2])
+        fig, axes = plt.subplots(2, 4, figsize=(12, 6))
+        axes = axes.flatten()
+        for i in range(num_maps):
+            feature_map = feature_maps[:, :, i]
+            feature_map = (feature_map - feature_map.min()) / (feature_map.max() - feature_map.min() + 1e-8)
+            axes[i].imshow(feature_map, cmap='viridis')
+            axes[i].set_title(f'Feature Map {i+1}')
+            axes[i].axis('off')
+        for i in range(num_maps, len(axes)):
+            fig.delaxes(axes[i])
+        plt.tight_layout()
+        st.pyplot(fig)
+        st.write("""
     **Feature Map Interpretation:**
     - Each feature map shows different patterns detected by the CNN filters.
     - Earlier layers detect simple features (edges, textures).
     - Deeper layers identify more complex patterns (tissue abnormalities, structures).
     - These visualizations help understand what the model is looking for in the image.
     """)
+        return
+    
+    # Attempt to extract feature maps from a Keras model
+    if hasattr(model, 'layers') and hasattr(model, 'inputs') and hasattr(model, 'outputs'):
+        try:
+            try:
+                import tensorflow as tf
+                from tensorflow import keras
+            except Exception:
+                st.warning("TensorFlow not available. Cannot extract feature maps from Keras model.")
+                return
+            # Find the first convolutional-like layer with 4D output
+            target_layer = None
+            for lyr in model.layers:
+                try:
+                    out_shape = getattr(lyr, 'output_shape', None)
+                    if isinstance(out_shape, tuple) and len(out_shape) == 4:
+                        target_layer = lyr
+                        break
+                except Exception:
+                    continue
+            if target_layer is None:
+                st.warning("No convolutional layer found to extract feature maps.")
+                return
+            # Build submodel
+            sub = keras.Model(model.inputs, target_layer.output)
+            img = image
+            if img.ndim == 2:
+                img = np.stack([img]*3, axis=-1)
+            if img.shape[-1] == 1:
+                img = np.repeat(img, 3, axis=-1)
+            feats = sub.predict(img[None, ...])  # (1, H, W, C)
+            feats = np.squeeze(feats, axis=0)
+            # Plot up to 8 maps
+            num_maps = min(8, feats.shape[-1])
+            fig, axes = plt.subplots(2, 4, figsize=(12, 6))
+            axes = axes.flatten()
+            for i in range(num_maps):
+                fmap = feats[:, :, i]
+                fmap = (fmap - np.min(fmap)) / (np.max(fmap) - np.min(fmap) + 1e-8)
+                axes[i].imshow(fmap, cmap='viridis')
+                axes[i].set_title(f'Feature Map {i+1}')
+                axes[i].axis('off')
+            for i in range(num_maps, len(axes)):
+                fig.delaxes(axes[i])
+            plt.tight_layout()
+            st.pyplot(fig)
+            st.caption(f"Layer: {getattr(target_layer, 'name', 'conv')} | Shape: {feats.shape}")
+            return
+        except Exception as e:
+            st.error(f"Failed to extract feature maps: {e}")
+            return
+    
+    st.warning("Unable to compute feature maps for this model type.")
 
 def visualize_grad_cam(image, model, last_conv_layer_name=None):
     """Visualize Grad-CAM if a real TensorFlow/Keras model is provided.
