@@ -555,7 +555,9 @@ elif not (st.session_state.get('show_model_comparison', False) or
 
                     with viz_tab:
                         st.subheader("Visualizations")
-                        if visualization_option == "Class Activation Maps":
+                        if visualization_option == "Prediction Confidence":
+                            visualize_prediction(prediction[0][0])
+                        elif visualization_option == "Class Activation Maps":
                             visualize_activation_maps(final_image, st.session_state.model)
                         elif visualization_option == "Feature Maps":
                             visualize_feature_maps(final_image, st.session_state.model)
