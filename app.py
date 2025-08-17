@@ -59,13 +59,33 @@ st.divider()
 # Sidebar with options
 st.sidebar.markdown("## 🔧 Analysis Settings")
 
-# Deterministic navigation: pick one view at a time
+# Deterministic navigation: pick one view at a time, with callback to sync flags
+def _apply_nav_choice():
+    choice = st.session_state.get("nav_radio", "Analyze")
+    if choice == "Analyze":
+        st.session_state.show_history = False
+        st.session_state.show_model_comparison = False
+    elif choice == "Patients":
+        st.session_state.show_patient_list = True
+        st.session_state.show_history = False
+        st.session_state.show_model_comparison = False
+    elif choice == "History":
+        st.session_state.show_history = True
+        st.session_state.show_model_comparison = False
+    elif choice == "Compare Models":
+        st.session_state.show_model_comparison = True
+        st.session_state.show_history = False
+
 nav_choice = st.sidebar.radio(
     "Navigation",
     ["Analyze", "Patients", "History", "Compare Models", "About"],
     index=0,
     key="nav_radio",
+    on_change=_apply_nav_choice,
 )
+
+# Apply once on first load
+_apply_nav_choice()
 
 # Initialize flags once
 if 'show_history' not in st.session_state:
@@ -74,22 +94,6 @@ if 'show_model_comparison' not in st.session_state:
     st.session_state.show_model_comparison = False
 if 'show_patient_list' not in st.session_state:
     st.session_state.show_patient_list = False
-
-# Apply navigation choice to flags so selected view replaces current one
-if nav_choice == "Analyze":
-    st.session_state.show_history = False
-    st.session_state.show_model_comparison = False
-    # Don't force-close patient list if user is inside Patients; only switch when user picks Patients
-elif nav_choice == "Patients":
-    st.session_state.show_patient_list = True
-    st.session_state.show_history = False
-    st.session_state.show_model_comparison = False
-elif nav_choice == "History":
-    st.session_state.show_history = True
-    st.session_state.show_model_comparison = False
-elif nav_choice == "Compare Models":
-    st.session_state.show_model_comparison = True
-    st.session_state.show_history = False
 
 # Model options with emojis for visual appeal
 st.sidebar.markdown("### 🧠 Model Selection")
@@ -160,16 +164,14 @@ sample_option = st.sidebar.selectbox(
     key="sample_select"  # Added unique key
 )
 
-# Optional quick toggle (kept for convenience) aligns with nav
+# Optional quick toggle (kept for convenience) aligns with nav without mutating radio key
 if st.sidebar.button("Compare Models", key="compare_models_button"):
-    st.session_state['nav_radio'] = "Compare Models"
     st.session_state.show_model_comparison = True
     st.session_state.show_history = False
     st.rerun()
 
-# Analysis History quick toggle aligns with nav
+# Analysis History quick toggle aligns with nav without mutating radio key
 if st.sidebar.button("View Analysis History", key="view_history_button"):
-    st.session_state['nav_radio'] = "History"
     st.session_state.show_history = True
     st.session_state.show_model_comparison = False
     st.rerun()
