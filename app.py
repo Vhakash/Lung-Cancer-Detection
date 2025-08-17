@@ -70,7 +70,7 @@ model_option = st.sidebar.selectbox(
 st.sidebar.markdown("### 📊 Visualization Tools")
 visualization_option = st.sidebar.selectbox(
     "Choose Visualization",
-    ["Prediction Confidence", "Class Activation Maps", "Feature Maps"],
+    ["Prediction Confidence", "Class Activation Maps", "Feature Maps", "Grad-CAM (scaffold)"],
     index=0,
     key="viz_select"  # Added unique key
 )
@@ -567,6 +567,10 @@ elif not (st.session_state.get('show_model_comparison', False) or
                             visualize_activation_maps(final_image, st.session_state.model)
                         elif visualization_option == "Feature Maps":
                             visualize_feature_maps(final_image, st.session_state.model)
+                        elif visualization_option == "Grad-CAM (scaffold)":
+                            # Placeholder: reuse activation maps until real Grad-CAM is integrated
+                            visualize_activation_maps(final_image, st.session_state.model)
+                            st.caption("Grad-CAM scaffold: showing activation maps as a placeholder. Replace with true Grad-CAM when a real model is integrated.")
                         else:
                             st.info("Use the sidebar to choose a visualization.")
                         st.subheader("Model Performance")
