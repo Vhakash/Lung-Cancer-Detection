@@ -203,3 +203,114 @@ def visualize_feature_maps(image, model, layer_index=1):
     - Deeper layers identify more complex patterns (tissue abnormalities, structures).
     - These visualizations help understand what the model is looking for in the image.
     """)
+
+def visualize_grad_cam(image, model, last_conv_layer_name=None):
+    """Visualize Grad-CAM if a real TensorFlow/Keras model is provided.
+    
+    Falls back to activation maps when TensorFlow is unavailable or the model
+    is not a Keras model (e.g., current MockModel).
+    
+    Args:
+        image (numpy.ndarray): Input image in HxWxC, range [0,1] preferred
+        model: Keras model (tf.keras.Model). If not, falls back.
+        last_conv_layer_name (str, optional): Name of last conv layer. If None, auto-detects.
+    """
+    # Lazy import to avoid hard dependency
+    try:
+        import tensorflow as tf
+        from tensorflow import keras
+    except Exception:
+        st.warning("TensorFlow not available. Showing activation maps instead.")
+        return visualize_activation_maps(image, model)
+    
+    # Ensure model looks like a Keras model
+    if not hasattr(model, 'layers') or not hasattr(model, 'inputs') or not hasattr(model, 'outputs'):
+        st.info("Current model is a mock placeholder. Showing activation maps instead.")
+        return visualize_activation_maps(image, model)
+    
+    # Prepare input tensor
+    img = image
+    if img.ndim == 2:
+        img = np.stack([img]*3, axis=-1)
+    if img.shape[-1] == 1:
+        img = np.repeat(img, 3, axis=-1)
+    # Add batch dim and ensure float32
+    img_tensor = tf.convert_to_tensor(img[None, ...], dtype=tf.float32)
+    
+    # Find last conv layer
+    last_conv = None
+    if last_conv_layer_name:
+        try:
+            last_conv = model.get_layer(last_conv_layer_name)
+        except Exception:
+            last_conv = None
+    if last_conv is None:
+        # Auto-detect last 4D output layer
+        for layer in reversed(model.layers):
+            try:
+                out_shape = layer.output_shape
+                if isinstance(out_shape, tuple) and len(out_shape) == 4:
+                    last_conv = layer
+                    break
+            except Exception:
+                continue
+    if last_conv is None:
+        st.warning("Could not locate a convolutional layer. Showing activation maps instead.")
+        return visualize_activation_maps(image, model)
+    
+    # Build a gradient model from inputs to (last conv outputs, predictions)
+    try:
+        grad_model = keras.Model([model.inputs], [last_conv.output, model.outputs])
+    except Exception as e:
+        st.error(f"Failed to build Grad-CAM graph: {e}")
+        return visualize_activation_maps(image, model)
+    
+    # Compute gradients of the top predicted class (or single logit) wrt conv outputs
+    with tf.GradientTape() as tape:
+        conv_outputs, preds = grad_model(img_tensor, training=False)
+        # Handle binary vs multi-class
+        if preds.shape[-1] == 1:
+            class_channel = preds[:, 0]
+        else:
+            top_class = tf.argmax(preds[0])
+            class_channel = preds[:, top_class]
+    grads = tape.gradient(class_channel, conv_outputs)
+    if grads is None:
+        st.warning("No gradients found for Grad-CAM. Showing activation maps instead.")
+        return visualize_activation_maps(image, model)
+    
+    # Global-average-pool the gradients over spatial dims
+    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+    conv_outputs = conv_outputs[0]
+    heatmap = tf.reduce_sum(tf.multiply(pooled_grads, conv_outputs), axis=-1)
+    
+    # Normalize heatmap to [0,1]
+    heatmap = tf.nn.relu(heatmap)
+    heatmap = heatmap / (tf.reduce_max(heatmap) + 1e-8)
+    heatmap = tf.image.resize(heatmap[..., None], (img.shape[0], img.shape[1]))[:, :, 0]
+    heatmap_np = heatmap.numpy()
+    
+    # Plot similar to activation maps
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
+    ax1.imshow(img)
+    ax1.set_title('Original Image')
+    ax1.axis('off')
+    
+    ax2.imshow(heatmap_np, cmap='jet')
+    ax2.set_title('Grad-CAM')
+    ax2.axis('off')
+    
+    ax3.imshow(img)
+    overlay = ax3.imshow(heatmap_np, cmap='jet', alpha=0.6)
+    ax3.set_title('Overlay')
+    ax3.axis('off')
+    cbar = fig.colorbar(overlay, ax=ax3)
+    cbar.set_label('Activation Intensity')
+    st.pyplot(fig)
+    
+    st.write("""
+    **Grad-CAM Interpretation:**
+    - Highlights spatial regions most influential for the model's predicted class.
+    - Works with real CNN backbones (e.g., Keras Inception/ResNet). For the current mock model, activation maps are shown instead.
+    - For best results, specify the last convolutional layer name of your model.
+    """)
