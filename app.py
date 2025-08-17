@@ -16,7 +16,7 @@ from patient_utils import create_patient, update_patient, get_patients, add_scan
 # Import our functionality from module files
 from model import MockModel, create_model, load_pretrained_model
 from preprocessing import preprocess_image, ensure_color_channels, normalize_dicom_pixel_array
-from visualization import visualize_prediction, visualize_model_performance, visualize_activation_maps, visualize_feature_maps
+from visualization import visualize_prediction, visualize_model_performance, visualize_activation_maps, visualize_feature_maps, visualize_grad_cam
 from utils import read_dicom_file, display_dicom_info, calculate_prediction_confidence, add_to_history, get_analysis_history, clear_analysis_history, compare_model_performances, initialize_analysis_history
 from sample_data import get_sample_image, get_sample_image_names
 from image_enhancement import apply_enhancement, get_available_enhancements
@@ -70,10 +70,14 @@ model_option = st.sidebar.selectbox(
 st.sidebar.markdown("### 📊 Visualization Tools")
 visualization_option = st.sidebar.selectbox(
     "Choose Visualization",
-    ["Prediction Confidence", "Class Activation Maps", "Feature Maps", "Grad-CAM (scaffold)"],
+    ["Prediction Confidence", "Class Activation Maps", "Feature Maps", "Grad-CAM"],
     index=0,
     key="viz_select"  # Added unique key
 )
+
+gradcam_last_conv = None
+if visualization_option == "Grad-CAM":
+    gradcam_last_conv = st.sidebar.text_input("Last conv layer (optional)", value="", help="Name of the last convolutional layer in your Keras model. Leave blank to auto-detect.") or None
 
 # Image Enhancement options with emoji
 st.sidebar.markdown("### 🔍 Image Enhancement")
@@ -567,10 +571,8 @@ elif not (st.session_state.get('show_model_comparison', False) or
                             visualize_activation_maps(final_image, st.session_state.model)
                         elif visualization_option == "Feature Maps":
                             visualize_feature_maps(final_image, st.session_state.model)
-                        elif visualization_option == "Grad-CAM (scaffold)":
-                            # Placeholder: reuse activation maps until real Grad-CAM is integrated
-                            visualize_activation_maps(final_image, st.session_state.model)
-                            st.caption("Grad-CAM scaffold: showing activation maps as a placeholder. Replace with true Grad-CAM when a real model is integrated.")
+                        elif visualization_option == "Grad-CAM":
+                            visualize_grad_cam(final_image, st.session_state.model, last_conv_layer_name=gradcam_last_conv)
                         else:
                             st.info("Use the sidebar to choose a visualization.")
                         st.subheader("Model Performance")
