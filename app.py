@@ -163,6 +163,8 @@ sample_option = st.sidebar.selectbox(
     index=0,
     key="sample_select"  # Added unique key
 )
+# Keep a unified key for downstream components expecting 'sample_option'
+st.session_state.sample_option = sample_option
 
 # Optional quick toggle (kept for convenience) aligns with nav without mutating radio key
 if st.sidebar.button("Compare Models", key="compare_models_button"):
@@ -463,7 +465,7 @@ elif not (st.session_state.get('show_model_comparison', False) or
             # Make prediction
             with st.spinner('Analyzing image...'):
                 start_time = time.time()
-                prediction = st.session_state.model.predict(np.expand_dims(final_image, axis=0))
+                prediction = st.session_state.model.predict(np.expand_dims(final_image, axis=0), sample_name=(sample_option if use_sample else None))
                 end_time = time.time()
                 
                 # Calculate processing time
