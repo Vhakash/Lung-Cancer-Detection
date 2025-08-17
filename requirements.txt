@@ -10,4 +10,4 @@ pydicom
 scikit-image
 sqlalchemy>=2.0
 python-dotenv>=1.0
-tensorflow>=2.12  # Required for real Grad-CAM and loading Keras models
+tensorflow>=2.16  # Needed for real Grad-CAM and loading Keras models
