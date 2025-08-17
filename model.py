@@ -2,6 +2,30 @@ import numpy as np
 import os
 import random
 import streamlit as st
+from typing import Optional
+
+def _tf_available() -> bool:
+    try:
+        import tensorflow  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+def load_keras_model_from_path(path: str):
+    """Load a Keras model (.h5/.keras/SavedModel) if TensorFlow is available.
+
+    Falls back to MockModel with a warning when TF is unavailable or load fails.
+    """
+    if not _tf_available():
+        st.warning("TensorFlow not installed. Using MockModel instead.")
+        return MockModel(model_type="basic")
+    try:
+        from tensorflow import keras
+        model = keras.models.load_model(path, compile=False)
+        return model
+    except Exception as e:
+        st.error(f"Failed to load Keras model from '{path}': {e}")
+        return MockModel(model_type="basic")
 
 class MockModel:
     """A mock model that simulates CNN predictions for lung cancer detection.
@@ -243,6 +267,25 @@ def load_pretrained_model():
     """Load a pre-trained model based on InceptionV3 for lung cancer detection.
     
     Returns:
-        MockModel: A model instance for lung cancer prediction
+        A tf.keras.Model binary classifier if TensorFlow is available, otherwise MockModel
     """
-    return MockModel(model_type="transfer")
+    if not _tf_available():
+        st.warning("TensorFlow not installed. Using MockModel (transfer) instead.")
+        return MockModel(model_type="transfer")
+    try:
+        from tensorflow import keras
+        from tensorflow.keras import layers
+        from tensorflow.keras.applications import InceptionV3
+
+        base = InceptionV3(include_top=False, weights="imagenet", input_shape=(224, 224, 3))
+        base.trainable = False
+        inputs = keras.Input(shape=(224, 224, 3))
+        x = base(inputs, training=False)
+        x = layers.GlobalAveragePooling2D()(x)
+        x = layers.Dropout(0.2)(x)
+        outputs = layers.Dense(1, activation="sigmoid")(x)
+        model = keras.Model(inputs, outputs, name="inceptionv3_binary")
+        return model
+    except Exception as e:
+        st.error(f"Failed to build InceptionV3 Keras model: {e}")
+        return MockModel(model_type="transfer")
