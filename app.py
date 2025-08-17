@@ -100,6 +100,25 @@ model_option = st.sidebar.selectbox(
     key="model_select"  # Added unique key
 )
 
+# Initialize session state variables if they don't exist
+if 'model' not in st.session_state:
+    if model_option == "Basic CNN":
+        st.session_state.model = create_model()
+    else:
+        st.session_state.model = load_pretrained_model()
+
+# Reload model when selection changes
+if 'model_option' not in st.session_state or st.session_state.model_option != model_option:
+    st.session_state.model_option = model_option
+    if model_option == "Basic CNN":
+        st.session_state.model = create_model()
+    else:
+        st.session_state.model = load_pretrained_model()
+
+# Show active model info in sidebar
+active_model_name = getattr(st.session_state.model, 'name', type(st.session_state.model).__name__)
+st.sidebar.caption(f"Active model: {active_model_name}")
+
 # Visualization options
 st.sidebar.markdown("### 📊 Visualization Tools")
 visualization_option = st.sidebar.selectbox(
@@ -175,21 +194,6 @@ if st.sidebar.button("Add New Patient"):
     st.session_state['selected_patient_id'] = None
     st.session_state['show_model_comparison'] = False
     st.session_state['show_history'] = False
-
-# Initialize session state variables if they don't exist
-if 'model' not in st.session_state:
-    if model_option == "Basic CNN":
-        st.session_state.model = create_model()
-    else:
-        st.session_state.model = load_pretrained_model()
-
-# Check if model changed
-if 'model_option' not in st.session_state or st.session_state.model_option != model_option:
-    st.session_state.model_option = model_option
-    if model_option == "Basic CNN":
-        st.session_state.model = create_model()
-    else:
-        st.session_state.model = load_pretrained_model()
 
 # Model Comparison View
 if st.session_state.show_model_comparison:

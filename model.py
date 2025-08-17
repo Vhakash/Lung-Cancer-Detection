@@ -42,7 +42,8 @@ class MockModel:
             model_type (str): Type of model to mock - 'basic' or 'transfer'
         """
         self.model_type = model_type
-        self.name = "Basic CNN" if model_type == "basic" else "Transfer Learning"
+        # Make mock model names explicit to avoid confusion with real Keras models
+        self.name = "Mock Basic CNN" if model_type == "basic" else "Mock Transfer Learning"
     
     def predict(self, img_array, sample_name=None):
         """Generate a prediction based on image characteristics.
