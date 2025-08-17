@@ -59,6 +59,38 @@ st.divider()
 # Sidebar with options
 st.sidebar.markdown("## 🔧 Analysis Settings")
 
+# Deterministic navigation: pick one view at a time
+nav_choice = st.sidebar.radio(
+    "Navigation",
+    ["Analyze", "Patients", "History", "Compare Models", "About"],
+    index=0,
+    key="nav_radio",
+)
+
+# Initialize flags once
+if 'show_history' not in st.session_state:
+    st.session_state.show_history = False
+if 'show_model_comparison' not in st.session_state:
+    st.session_state.show_model_comparison = False
+if 'show_patient_list' not in st.session_state:
+    st.session_state.show_patient_list = False
+
+# Apply navigation choice to flags so selected view replaces current one
+if nav_choice == "Analyze":
+    st.session_state.show_history = False
+    st.session_state.show_model_comparison = False
+    # Don't force-close patient list if user is inside Patients; only switch when user picks Patients
+elif nav_choice == "Patients":
+    st.session_state.show_patient_list = True
+    st.session_state.show_history = False
+    st.session_state.show_model_comparison = False
+elif nav_choice == "History":
+    st.session_state.show_history = True
+    st.session_state.show_model_comparison = False
+elif nav_choice == "Compare Models":
+    st.session_state.show_model_comparison = True
+    st.session_state.show_history = False
+
 # Model options with emojis for visual appeal
 st.sidebar.markdown("### 🧠 Model Selection")
 model_option = st.sidebar.selectbox(
@@ -109,76 +141,26 @@ sample_option = st.sidebar.selectbox(
     key="sample_select"  # Added unique key
 )
 
-# Model Comparison
+# Optional quick toggle (kept for convenience) aligns with nav
 if st.sidebar.button("Compare Models", key="compare_models_button"):
+    st.session_state['nav_radio'] = "Compare Models"
     st.session_state.show_model_comparison = True
-else:
-    if 'show_model_comparison' not in st.session_state:
-        st.session_state.show_model_comparison = False
+    st.session_state.show_history = False
+    st.rerun()
 
-# Analysis History
+# Analysis History quick toggle aligns with nav
 if st.sidebar.button("View Analysis History", key="view_history_button"):
+    st.session_state['nav_radio'] = "History"
     st.session_state.show_history = True
-else:
-    if 'show_history' not in st.session_state:
-        st.session_state.show_history = False
-        
+    st.session_state.show_model_comparison = False
+    st.rerun()
+
 # Clear History
 if st.sidebar.button("Clear History", key="clear_history_button"):
     clear_analysis_history()
     st.sidebar.success("Analysis history cleared!")
     if 'show_history' in st.session_state:
         st.session_state.show_history = False
-
-# Navigation
-st.sidebar.markdown("## 🧭 Navigation")
-nav = st.sidebar.radio(
-    "Go to",
-    ["Analyze", "Patients", "History", "Compare Models", "About"],
-    index=0,
-    key="nav_radio"
-)
-
-# Apply navigation state overrides
-if nav == "Compare Models":
-    st.session_state.show_model_comparison = True
-    st.session_state.show_history = False
-    st.session_state['show_patient_list'] = False
-elif nav == "History":
-    st.session_state.show_model_comparison = False
-    st.session_state.show_history = True
-    st.session_state['show_patient_list'] = False
-elif nav == "Patients":
-    st.session_state.show_model_comparison = False
-    st.session_state.show_history = False
-    st.session_state['show_patient_list'] = True
-else:
-    # Analyze / About fall back to main view unless About
-    if nav == "About":
-        st.session_state.show_model_comparison = False
-        st.session_state.show_history = False
-        st.session_state['show_patient_list'] = False
-
-# About page
-if nav == "About":
-    st.header("About This App")
-    st.markdown(
-        """
-        This Streamlit application demonstrates an end-to-end workflow for lung cancer scan analysis:
-        
-        - Upload and preprocess DICOM and image files with medical-grade windowing.
-        - Run predictions with selectable models (currently mocked for demo).
-        - Visualize results using confidence gauges, activation maps, and feature maps.
-        - Manage patients and persist scan analyses to a database with image storage.
-        
-        Roadmap:
-        - Integrate real trained models (TensorFlow/PyTorch) with Grad-CAM.
-        - Batch analysis and 3D series support.
-        - Exportable PDF/CSV reports and audit logging.
-        """
-    )
-    st.info("Use the sidebar Navigation to switch to Analyze, Patients, History, or Compare Models.")
-    st.stop()
 
 # Add Patient Management to sidebar
 st.sidebar.markdown("## 👥 Patient Management")
@@ -699,3 +681,24 @@ elif not (st.session_state.get('show_model_comparison', False) or
         except Exception as e:
             st.error(f"Error processing image: {str(e)}")
             st.write("Please try another image or check the file format.")
+
+# About page
+if nav_choice == "About":
+    st.header("About This App")
+    st.markdown(
+        """
+        This Streamlit application demonstrates an end-to-end workflow for lung cancer scan analysis:
+        
+        - Upload and preprocess DICOM and image files with medical-grade windowing.
+        - Run predictions with selectable models (currently mocked for demo).
+        - Visualize results using confidence gauges, activation maps, and feature maps.
+        - Manage patients and persist scan analyses to a database with image storage.
+        
+        Roadmap:
+        - Integrate real trained models (TensorFlow/PyTorch) with Grad-CAM.
+        - Batch analysis and 3D series support.
+        - Exportable PDF/CSV reports and audit logging.
+        """
+    )
+    st.info("Use the sidebar Navigation to switch to Analyze, Patients, History, or Compare Models.")
+    st.stop()
