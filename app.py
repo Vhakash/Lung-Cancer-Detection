@@ -1,3 +1,8 @@
+"""
+Lung Cancer Detection AI - Main Application
+A Streamlit-based medical imaging analysis tool for lung cancer detection.
+"""
+
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,706 +14,144 @@ import io
 import time
 import zipfile
 from datetime import datetime
-import random
 import uuid
+
+# Import configuration and utilities
+from config import APP_TITLE, APP_ICON, PAGE_LAYOUT, ensure_directories
+from logger import logger
+from error_handler import handle_errors, validate_file_upload, ValidationError
+from session_manager import session_manager
+from ui_components import ui
+
+# Import patient management
 from patient_ui import show_patient_form, show_patient_list, show_patient_details
 from models import get_db, Patient, Scan
-from patient_utils import create_patient, update_patient, get_patients, add_scan_to_patient, update_scan_results
+from patient_utils import create_patient, get_patients, add_scan_to_patient
 
-# Import our functionality from module files
-from model import MockModel, create_model, load_pretrained_model
+# Import core functionality
+from model import create_model, load_pretrained_model
 from preprocessing import preprocess_image, ensure_color_channels, normalize_dicom_pixel_array
 from visualization import visualize_prediction, visualize_model_performance, visualize_activation_maps, visualize_feature_maps, visualize_grad_cam
-from utils import read_dicom_file, display_dicom_info, calculate_prediction_confidence, add_to_history, get_analysis_history, clear_analysis_history, compare_model_performances, initialize_analysis_history
+from utils import read_dicom_file, display_dicom_info, calculate_prediction_confidence, compare_model_performances
 from sample_data import get_sample_image, get_sample_image_names
-from image_enhancement import apply_enhancement, get_available_enhancements
-
-# Initialize session state for tracking analysis history
-initialize_analysis_history()
+from image_enhancement import apply_enhancement
 
 # Set page configuration
 st.set_page_config(
-    page_title="Lung Cancer Detection",
-    page_icon="🫁",
-    layout="wide"
+    page_title=APP_TITLE,
+    page_icon=APP_ICON,
+    layout=PAGE_LAYOUT
 )
 
 # Ensure required directories exist
-os.makedirs('instance', exist_ok=True)
-os.makedirs('instance/uploads', exist_ok=True)
+ensure_directories()
 
-# Application title and description with a more creative design
-st.markdown("""
-# 🫁 Lung Cancer Detection AI
-""")
+# Initialize session state
+session_manager.initialize_session_state()
 
-# Create a more engaging intro with columns
-col1, col2 = st.columns([2,1])
-with col1:
-    st.markdown("""
-    ### Early detection saves lives
-    This AI-powered tool analyzes medical images to detect potential signs of lung cancer.
-    Simply upload a lung CT scan or X-ray image, or try one of our sample images.
-    """)
-with col2:
-    st.image("https://raw.githubusercontent.com/streamlit/example-data/master/logo.jpg", width=150)
-    
-# Add a divider for better visual organization
-st.divider()
+logger.info("Application started")
 
-# Sidebar with options
-st.sidebar.markdown("## 🔧 Analysis Settings")
+# Render application header
+ui.render_header()
 
-# Deterministic navigation: pick one view at a time, with callback to sync flags
-def _apply_nav_choice():
-    choice = st.session_state.get("nav_radio", "Analyze")
+# Render sidebar navigation
+nav_choice = ui.render_sidebar_navigation()
+
+# Handle navigation
+@handle_errors
+def handle_navigation(choice):
+    """Handle navigation based on user selection."""
     if choice == "Analyze":
-        st.session_state.show_history = False
-        st.session_state.show_model_comparison = False
+        session_manager.navigate_to('analyze')
     elif choice == "Patients":
-        st.session_state.show_patient_list = True
-        st.session_state.show_history = False
-        st.session_state.show_model_comparison = False
+        session_manager.navigate_to('patients')
     elif choice == "History":
-        st.session_state.show_history = True
-        st.session_state.show_model_comparison = False
+        session_manager.navigate_to('history')
     elif choice == "Compare Models":
-        st.session_state.show_model_comparison = True
-        st.session_state.show_history = False
+        session_manager.navigate_to('compare')
 
-nav_choice = st.sidebar.radio(
-    "Navigation",
-    ["Analyze", "Patients", "History", "Compare Models", "About"],
-    index=0,
-    key="nav_radio",
-    on_change=_apply_nav_choice,
-)
+handle_navigation(nav_choice)
 
-# Apply once on first load
-_apply_nav_choice()
+# Render model selector
+model_option = ui.render_model_selector()
 
-# Initialize flags once
-if 'show_history' not in st.session_state:
-    st.session_state.show_history = False
-if 'show_model_comparison' not in st.session_state:
-    st.session_state.show_model_comparison = False
-if 'show_patient_list' not in st.session_state:
-    st.session_state.show_patient_list = False
-
-# Model options with emojis for visual appeal
-st.sidebar.markdown("### 🧠 Model Selection")
-model_option = st.sidebar.selectbox(
-    "Choose AI Model",
-    ["Basic CNN", "InceptionV3 Transfer Learning"],
-    index=0,
-    key="model_select"  # Added unique key
-)
-
-# Initialize session state variables if they don't exist
-if 'model' not in st.session_state:
-    if model_option == "Basic CNN":
-        st.session_state.model = create_model()
-    else:
-        st.session_state.model = load_pretrained_model()
-
-# Reload model when selection changes
-if 'model_option' not in st.session_state or st.session_state.model_option != model_option:
-    st.session_state.model_option = model_option
-    if model_option == "Basic CNN":
-        st.session_state.model = create_model()
-    else:
-        st.session_state.model = load_pretrained_model()
-
-# Show active model info in sidebar
-active_model_name = getattr(st.session_state.model, 'name', type(st.session_state.model).__name__)
-st.sidebar.caption(f"Active model: {active_model_name}")
-
-# Visualization options
-st.sidebar.markdown("### 📊 Visualization Tools")
-visualization_option = st.sidebar.selectbox(
-    "Choose Visualization",
-    ["Prediction Confidence", "Class Activation Maps", "Feature Maps", "Grad-CAM"],
-    index=0,
-    key="viz_select"  # Added unique key
-)
-
-gradcam_last_conv = None
-if visualization_option == "Grad-CAM":
-    gradcam_last_conv = st.sidebar.text_input("Last conv layer (optional)", value="", help="Name of the last convolutional layer in your Keras model. Leave blank to auto-detect.") or None
-
-# Image Enhancement options with emoji
-st.sidebar.markdown("### 🔍 Image Enhancement")
-enhancement_option = st.sidebar.selectbox(
-    "Enhancement Technique",
-    ["None"] + get_available_enhancements(),
-    index=0,
-    key="enhancement_select"  # Added unique key
-)
-
-enhancement_strength = st.sidebar.slider(
-    "Enhancement Strength",
-    min_value=0.5,
-    max_value=1.5,
-    value=1.0,
-    step=0.1,
-    disabled=(enhancement_option == "None"),
-    key="enhancement_slider"  # Added unique key
-)
-
-# Sample Images with emoji
-st.sidebar.markdown("### 🔬 Sample Medical Images")
-sample_option = st.sidebar.selectbox(
-    "Select Sample Case",
-    ["None"] + get_sample_image_names(),
-    index=0,
-    key="sample_select"  # Added unique key
-)
-# Keep a unified key for downstream components expecting 'sample_option'
-st.session_state.sample_option = sample_option
-
-# Optional quick toggle (kept for convenience) aligns with nav without mutating radio key
-if st.sidebar.button("Compare Models", key="compare_models_button"):
-    st.session_state.show_model_comparison = True
-    st.session_state.show_history = False
-    st.rerun()
-
-# Analysis History quick toggle aligns with nav without mutating radio key
-if st.sidebar.button("View Analysis History", key="view_history_button"):
-    st.session_state.show_history = True
-    st.session_state.show_model_comparison = False
-    st.rerun()
-
-# Clear History
-if st.sidebar.button("Clear History", key="clear_history_button"):
-    clear_analysis_history()
-    st.sidebar.success("Analysis history cleared!")
-    if 'show_history' in st.session_state:
-        st.session_state.show_history = False
-
-# Add Patient Management to sidebar
-st.sidebar.markdown("## 👥 Patient Management")
-if st.sidebar.button("View All Patients"):
-    st.session_state['show_patient_list'] = True
-    st.session_state['selected_patient_id'] = None
-    st.session_state['show_model_comparison'] = False
-    st.session_state['show_history'] = False
-
-if st.sidebar.button("Add New Patient"):
-    st.session_state['show_patient_form'] = True
-    st.session_state['selected_patient_id'] = None
-    st.session_state['show_model_comparison'] = False
-    st.session_state['show_history'] = False
-
-# Model Comparison View
-if st.session_state.show_model_comparison:
-    st.subheader("Model Comparison")
-    
-    # Get performance metrics
-    metrics_df = compare_model_performances()
-    
-    # Display the metrics table
-    st.dataframe(metrics_df)
-    
-    # Create a bar chart for visual comparison
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    # Get metrics without the model names and processing time for bar chart
-    plot_metrics = metrics_df.drop(columns=['Model Type', 'Processing Time (ms)'])
-    
-    # Plot
-    plot_metrics.plot(kind='bar', ax=ax)
-    ax.set_ylabel('Score')
-    ax.set_title('Model Performance Comparison')
-    ax.set_ylim(0, 1.1)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=4)
-    
-    st.pyplot(fig)
-    
-    # Add explanatory text
-    st.markdown("""
-    ### Comparison Insights
-    - **Transfer Learning Model** generally shows better performance across all metrics.
-    - The improved performance comes at a cost of slightly increased processing time.
-    - For critical diagnostic applications, the Transfer Learning model would be preferred.
-    - For faster screening applications where speed is important, the Basic CNN may be sufficient.
-    """)
-    
-    # Button to close the comparison view
-    if st.button("Close Comparison View", key="close_compare_view"):
-        st.session_state.show_model_comparison = False
-        st.rerun()
-
-# DB-backed History view: When nav == "History" or show_history flag is set, list recent scans
-# with filters and actions to jump to patient details.
-if st.session_state.get('show_history') or ("nav_radio" in st.session_state and st.session_state['nav_radio'] == "History"):
-    st.subheader("Analysis History")
-
-    # Filters
-    colf1, colf2, colf3 = st.columns([2, 1, 1])
-    with colf1:
-        name_filter = st.text_input("Search by patient name")
-    with colf2:
-        pred_filter = st.selectbox("Prediction", ["All", "Cancer", "No Cancer"], index=0)
-    with colf3:
-        limit = st.selectbox("Show", [20, 50, 100], index=0)
-
-    db = next(get_db())
+# Handle model loading
+@handle_errors
+def load_model(model_type):
+    """Load the selected model."""
     try:
-        q = db.query(Scan).order_by(Scan.scan_date.desc()).limit(limit)
-        scans = q.all()
+        if model_type == "Basic CNN":
+            return create_model()
+        else:
+            return load_pretrained_model()
     except Exception as e:
-        st.error(f"Failed to load history: {e}")
-        scans = []
-    finally:
-        db.close()
+        logger.error(f"Failed to load model {model_type}: {str(e)}")
+        ui.render_error_message(f"Failed to load model: {str(e)}")
+        return None
 
-    # Apply client-side filters (name/prediction)
-    def match_name(p):
-        if not name_filter:
-            return True
-        full = f"{p.last_name}, {p.first_name}".lower()
-        return name_filter.lower() in full
+# Initialize or update model
+if session_manager.get('model') is None or session_manager.get('model_option') != model_option:
+    with ui.render_loading_spinner("Loading model..."):
+        model = load_model(model_option)
+        if model:
+            session_manager.set('model', model)
+            session_manager.set('model_option', model_option)
+            logger.info(f"Loaded model: {model_option}")
 
-    # Build rows with patient info
-    rows = []
-    if scans:
-        db = next(get_db())
-        try:
-            for s in scans:
-                patient = db.query(Patient).filter(Patient.id == s.patient_id).first() if s.patient_id else None
-                label = s.prediction or "N/A"
-                if pred_filter != "All" and label != pred_filter:
-                    continue
-                if patient and not match_name(patient):
-                    continue
-                rows.append((s, patient))
-        finally:
-            db.close()
+# Show active model info
+if session_manager.get('model'):
+    active_model_name = getattr(session_manager.get('model'), 'name', type(session_manager.get('model')).__name__)
+    st.sidebar.caption(f"Active model: {active_model_name}")
 
-    if not rows:
-        st.info("No analyses found.")
-    else:
-        for s, patient in rows:
-            with st.container():
-                c1, c2, c3, c4 = st.columns([1, 2, 2, 1])
-                with c1:
-                    # Thumbnail if file exists
-                    if s.file_path and os.path.exists(s.file_path):
-                        st.image(s.file_path, use_container_width=True)
-                    else:
-                        st.caption("No image")
-                with c2:
-                    st.write(f"**Patient:** {patient.first_name} {patient.last_name}" if patient else "**Patient:** Unknown")
-                    st.write(f"**Date:** {s.scan_date.strftime('%Y-%m-%d %H:%M') if s.scan_date else 'N/A'}")
-                with c3:
-                    st.write(f"**Prediction:** {s.prediction or 'N/A'}")
-                    st.write(f"**Confidence:** {f'{s.confidence:.2f}%' if s.confidence is not None else 'N/A'}")
-                    if s.notes:
-                        st.caption(s.notes)
-                with c4:
-                    if patient and st.button("View", key=f"view_patient_{s.id}"):
-                        st.session_state['selected_patient_id'] = patient.id
-                        st.session_state['show_patient_list'] = True
-                        st.session_state['nav_radio'] = "Patients"
-                        st.rerun()
+# Render visualization selector
+visualization_option, gradcam_last_conv = ui.render_visualization_selector()
 
-# Main content area
-if st.session_state.get('show_patient_form', False):
-    st.header("Add New Patient")
-    form_data = show_patient_form()
-    if form_data:
-        db = next(get_db())
-        try:
-            create_patient(db, form_data)
-            db.commit()
-            st.success("Patient created successfully!")
-            st.session_state['show_patient_form'] = False
-            st.session_state['show_patient_list'] = True
-            st.rerun()
-        except Exception as e:
-            db.rollback()
-            st.error(f"Error creating patient: {str(e)}")
-        finally:
-            db.close()
+# Render enhancement selector
+enhancement_option, enhancement_strength = ui.render_enhancement_selector()
 
-elif 'selected_patient_id' in st.session_state and st.session_state['selected_patient_id']:
-    db = next(get_db())
-    try:
-        show_patient_details(db, st.session_state['selected_patient_id'])
-    finally:
-        db.close()
+# Render sample selector
+sample_option = ui.render_sample_selector()
+session_manager.set('sample_option', sample_option)
 
-elif st.session_state.get('show_patient_list', False):
-    db = next(get_db())
-    try:
-        show_patient_list(db)
-    finally:
-        db.close()
+# Store UI selections in session state for other components
+session_manager.set('visualization_option', visualization_option)
+session_manager.set('gradcam_layer', gradcam_last_conv)
+session_manager.set('enhancement_option', enhancement_option)
+session_manager.set('enhancement_strength', enhancement_strength)
 
-# Original app content
-elif not (st.session_state.get('show_model_comparison', False) or 
-          st.session_state.get('show_history', False)):
-    # Create header section for main interface
-    st.header("Analyze Medical Image")
-    
-    # Input method tabs
-    tab1, tab2 = st.tabs(["Upload Image", "Use Sample Image"])
-    
-    use_sample = False
-    
-    # Tab 1: Upload Image
-    with tab1:
-        uploaded_file = st.file_uploader(
-            "Choose a lung CT scan or X-ray image file", 
-            type=["jpg", "jpeg", "png", "dcm"],
-            key="file_uploader"  # Added unique key
-        )
-    
-    # Tab 2: Sample Image
-    with tab2:
-        if sample_option != "None":
-            st.write(f"Selected sample: **{sample_option}**")
-            sample_image = get_sample_image(sample_option)
-            if sample_image:
-                st.image(sample_image, caption=f"Sample Image: {sample_option}", use_container_width=True)
-                use_sample = True
-    
-    # Process images (either uploaded or sample)
-    if uploaded_file is not None or use_sample:
-        # Creating columns for display
-        col1, col2 = st.columns(2)
-        
-        try:
-            # Process uploaded file
-            if uploaded_file is not None:
-                # Determine file type and read accordingly
-                file_extension = uploaded_file.name.split('.')[-1].lower()
-                
-                if file_extension == 'dcm':
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.dcm') as temp_file:
-                        temp_file.write(uploaded_file.getvalue())
-                        temp_file_path = temp_file.name
-                    
-                    # Read DICOM file
-                    image_data, pixel_array = read_dicom_file(temp_file_path)
-                    
-                    # Display DICOM information
-                    with col1:
-                        st.subheader("Original Image")
-                        st.image(pixel_array, caption="Original DICOM Image", use_container_width=True)
-                        display_dicom_info(image_data)
-                    
-                    # Apply windowing/normalization for better visualization & model input
-                    with col1:
-                        st.subheader("Windowed/Normalized DICOM")
-                        normalized_pixel_array = normalize_dicom_pixel_array(
-                            pixel_array,
-                            window_percentiles=(5, 95),
-                            apply_clahe=True
-                        )
-                        st.image(normalized_pixel_array, caption="Windowed/Normalized DICOM Image", use_container_width=True)
-                    
-                    # Convert to format suitable for model
-                    image_array = ensure_color_channels(normalized_pixel_array)
-                    processed_image = preprocess_image(image_array)
-                    
-                    # Clean up the temp file
-                    os.unlink(temp_file_path)
-                    
-                else:
-                    # For other image formats
-                    image = Image.open(uploaded_file)
-                    
-                    with col1:
-                        st.subheader("Original Image")
-                        st.image(image, caption=f"Original Image: {uploaded_file.name}", use_container_width=True)
-                    
-                    # Convert to numpy array and preprocess
-                    image_array = np.array(image)
-                    # Ensure image has proper color channels
-                    image_array = ensure_color_channels(image_array)
-                    processed_image = preprocess_image(image_array)
-            
-            # Process sample image
-            elif use_sample:
-                image_array = np.array(sample_image)
-                
-                with col1:
-                    st.subheader("Original Sample Image")
-                    st.image(sample_image, caption=f"Sample: {sample_option}", use_container_width=True)
-                
-                # Ensure image has proper color channels
-                image_array = ensure_color_channels(image_array)
-                processed_image = preprocess_image(image_array)
-            
-            # Apply enhancement if selected
-            if enhancement_option != "None":
-                with st.spinner(f'Applying {enhancement_option} enhancement...'):
-                    # Apply enhancement
-                    enhanced_image = apply_enhancement(
-                        processed_image,
-                        enhancement_option,
-                        enhancement_strength
-                    )
-                    
-                    # Show the enhanced image
-                    with col1:
-                        st.subheader("Enhanced Image")
-                        st.image(enhanced_image, caption=f"Enhanced with {enhancement_option}", use_container_width=True)
-                    
-                    # Use enhanced image for prediction
-                    final_image = enhanced_image
-            else:
-                # Use original processed image
-                final_image = processed_image
-            
-            # Make prediction
-            with st.spinner('Analyzing image...'):
-                start_time = time.time()
-                prediction = st.session_state.model.predict(np.expand_dims(final_image, axis=0), sample_name=(sample_option if use_sample else None))
-                end_time = time.time()
-                
-                # Calculate processing time
-                processing_time = (end_time - start_time) * 1000  # convert to ms
-                
-                # Add to history
-                add_to_history(
-                    final_image,
-                    "Transfer Learning" if model_option == "InceptionV3 Transfer Learning" else "Basic CNN",
-                    prediction,
-                    enhancement_option if enhancement_option != "None" else None
-                )
-                
-                # Display results & actions (tabs for cleaner UI)
-                with col2:
-                    results_tab, viz_tab, save_tab = st.tabs(["Results", "Visualizations", "Save"])
+# Quick action buttons
+if st.sidebar.button("Compare Models", key="compare_models_button"):
+    session_manager.navigate_to('compare')
+    st.rerun()
 
-                    # Compute classification
-                    label, confidence = calculate_prediction_confidence(prediction[0][0])
+if st.sidebar.button("View Analysis History", key="view_history_button"):
+    session_manager.navigate_to('history')
+    st.rerun()
 
-                    with results_tab:
-                        st.subheader("Analysis Results")
-                        if label == "Cancer":
-                            st.error(f"**Prediction: {label}** (Confidence: {confidence:.2f}%)")
-                        else:
-                            st.success(f"**Prediction: {label}** (Confidence: {confidence:.2f}%)")
-                        st.write(f"Processing time: {processing_time:.2f} ms")
-                        visualize_prediction(prediction[0][0])
+if st.sidebar.button("Clear History", key="clear_history_button"):
+    session_manager.clear_analysis_history()
+    ui.render_success_message("Analysis history cleared!")
 
-                        # Downloadable report and image
-                        st.markdown("---")
-                        st.subheader("Download Report")
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        report = {
-                            'timestamp': timestamp,
-                            'model': model_option,
-                            'prediction': label,
-                            'confidence_percent': round(float(confidence), 2),
-                            'processing_time_ms': round(float(processing_time), 2),
-                            'enhancement': enhancement_option if enhancement_option != "None" else "None",
-                            'visualization': visualization_option,
-                        }
-                        # CSV bytes
-                        try:
-                            import pandas as pd
-                            csv_bytes = pd.DataFrame([report]).to_csv(index=False).encode('utf-8')
-                        except Exception:
-                            # Fallback minimal CSV
-                            csv_bytes = ("timestamp,model,prediction,confidence_percent,processing_time_ms,enhancement,visualization\n" +
-                                         f"{report['timestamp']},{report['model']},{report['prediction']},{report['confidence_percent']},{report['processing_time_ms']},{report['enhancement']},{report['visualization']}\n").encode('utf-8')
+# Render patient management quick actions
+ui.render_patient_quick_actions()
 
-                        # Image bytes (PNG) from final_image (0..1 float)
-                        img_arr = (final_image * 255).clip(0, 255).astype(np.uint8)
-                        if img_arr.ndim == 2:
-                            img_arr = np.stack([img_arr]*3, axis=-1)
-                        img_buf = io.BytesIO()
-                        Image.fromarray(img_arr).save(img_buf, format='PNG')
-                        img_buf.seek(0)
+# Import views and analysis interface
+from views import views
+from analysis_interface import analysis_interface
 
-                        col_dl1, col_dl2, col_dl3 = st.columns(3)
-                        with col_dl1:
-                            st.download_button(
-                                label="Download CSV Report",
-                                data=csv_bytes,
-                                file_name=f"analysis_report_{timestamp}.csv",
-                                mime="text/csv",
-                                key="dl_csv_report"
-                            )
-                        with col_dl2:
-                            st.download_button(
-                                label="Download Image PNG",
-                                data=img_buf.getvalue(),
-                                file_name=f"analysis_image_{timestamp}.png",
-                                mime="image/png",
-                                key="dl_png_image"
-                            )
-                        with col_dl3:
-                            # ZIP bundle
-                            zip_buf = io.BytesIO()
-                            with zipfile.ZipFile(zip_buf, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
-                                zf.writestr(f"analysis_report_{timestamp}.csv", csv_bytes)
-                                zf.writestr(f"analysis_image_{timestamp}.png", img_buf.getvalue())
-                            zip_buf.seek(0)
-                            st.download_button(
-                                label="Download ZIP Bundle",
-                                data=zip_buf.getvalue(),
-                                file_name=f"analysis_{timestamp}.zip",
-                                mime="application/zip",
-                                key="dl_zip_bundle"
-                            )
+# Main content routing based on current page
+current_page = session_manager.get('current_page', 'analyze')
 
-                    with viz_tab:
-                        st.subheader("Visualizations")
-                        if visualization_option == "Prediction Confidence":
-                            visualize_prediction(prediction[0][0])
-                        elif visualization_option == "Class Activation Maps":
-                            visualize_activation_maps(final_image, st.session_state.model)
-                        elif visualization_option == "Feature Maps":
-                            visualize_feature_maps(final_image, st.session_state.model)
-                        elif visualization_option == "Grad-CAM":
-                            visualize_grad_cam(final_image, st.session_state.model, last_conv_layer_name=gradcam_last_conv)
-                        else:
-                            st.info("Use the sidebar to choose a visualization.")
-                        st.subheader("Model Performance")
-                        visualize_model_performance(model_option)
+if current_page == 'compare' or session_manager.get('show_model_comparison', False):
+    views.render_model_comparison()
+elif current_page == 'history' or session_manager.get('show_history', False):
+    views.render_analysis_history()
+elif current_page == 'patients' or session_manager.get('show_patient_list', False):
+    views.render_patient_management()
+elif nav_choice == "About":
+    views.render_about()
+else:
+    # Default to analysis interface
+    analysis_interface.render_main_analysis()
 
-                    with save_tab:
-                        st.subheader("Save Analysis")
-                        # Fetch patients for selection
-                        patient_options = [(None, "-- Select patient --")]
-                        db = next(get_db())
-                        try:
-                            pts = get_patients(db)
-                            patient_options.extend([(p.id, f"{p.last_name}, {p.first_name} (MRN: {p.medical_record_number})") for p in pts])
-                        finally:
-                            db.close()
-                        # Empty-state: no patients
-                        has_patients = bool(pts)
-                        if not has_patients:
-                            st.info("No patients found. Create a patient to save this analysis.")
-                        
-                        # Inline create patient form
-                        with st.expander("➕ Create New Patient", expanded=not has_patients):
-                            with st.form(key="inline_create_patient_form"):
-                                c1, c2 = st.columns(2)
-                                with c1:
-                                    new_first = st.text_input("First Name")
-                                    new_dob = st.date_input("Date of Birth")
-                                    new_email = st.text_input("Email", placeholder="name@example.com")
-                                with c2:
-                                    new_last = st.text_input("Last Name")
-                                    new_gender = st.selectbox("Gender", ["", "Male", "Female", "Other"], index=0)
-                                    new_phone = st.text_input("Phone", placeholder="+1-555-123-4567")
-                                submitted = st.form_submit_button("Create Patient")
-                                if submitted:
-                                    if not new_first or not new_last or not new_dob or not new_gender:
-                                        st.warning("Please fill First/Last Name, Date of Birth, and Gender.")
-                                    else:
-                                        db = next(get_db())
-                                        try:
-                                            create_patient(db, {
-                                                'first_name': new_first,
-                                                'last_name': new_last,
-                                                'date_of_birth': new_dob,
-                                                'gender': new_gender,
-                                                'email': new_email,
-                                                'phone': new_phone
-                                            })
-                                            st.success("Patient created.")
-                                            # Rerun to refresh patient list
-                                            st.rerun()
-                                        except Exception as e:
-                                            st.error(f"Failed to create patient: {e}")
-                                        finally:
-                                            db.close()
-                        
-                        if not has_patients:
-                            if st.button("Add New Patient", key="save_tab_add_patient"):
-                                st.session_state['show_patient_list'] = True
-                                st.session_state['nav_radio'] = "Patients"
-                                st.rerun()
-                            # Do not render further Save UI when no patients
-                            st.caption("Create a patient to enable saving.")
-                        
-                        if has_patients:
-                            id_to_label = {pid: label for pid, label in patient_options}
-                            labels = [label for _, label in patient_options]
-                            selected_label = st.selectbox("Assign to patient", options=labels, index=0, key="assign_patient_select")
-                            # Reverse lookup selected id
-                            selected_patient_id = None
-                            for pid, lbl in id_to_label.items():
-                                if lbl == selected_label:
-                                    selected_patient_id = pid
-                                    break
-                            notes = st.text_area("Notes", placeholder="Optional notes about this analysis")
-                            if st.button("Save to Patient Record", key="save_scan_btn"):
-                                if not selected_patient_id:
-                                    st.warning("Please select a patient to save the analysis.")
-                                else:
-                                    # Prepare image to save
-                                    img_to_save = (final_image * 255).clip(0, 255).astype(np.uint8)
-                                    if img_to_save.ndim == 2:
-                                        img_to_save = np.stack([img_to_save]*3, axis=-1)
-                                    save_name = f"scan_{uuid.uuid4().hex[:8]}.png"
-                                    save_path = os.path.join('instance', 'uploads', save_name)
-                                    Image.fromarray(img_to_save).save(save_path)
-                                    # Determine scan metadata
-                                    if 'uploaded_file' in locals() and uploaded_file is not None:
-                                        original_filename = uploaded_file.name
-                                        scan_type = 'DICOM' if uploaded_file.name.lower().endswith('.dcm') else 'Image'
-                                    elif use_sample:
-                                        original_filename = f"{sample_option}.png"
-                                        scan_type = 'Sample'
-                                    else:
-                                        original_filename = save_name
-                                        scan_type = 'Image'
-                                    # Persist to DB
-                                    db = next(get_db())
-                                    try:
-                                        scan_record = add_scan_to_patient(db, selected_patient_id, {
-                                            'scan_type': scan_type,
-                                            'file_path': save_path,
-                                            'original_filename': original_filename,
-                                            'notes': notes
-                                        })
-                                        update_scan_results(db, scan_record.id, {
-                                            'prediction': label,
-                                            'confidence': float(confidence),
-                                            'findings': notes
-                                        })
-                                        st.success("Analysis saved to patient record.")
-                                        # Offer to view patient details immediately
-                                        if st.button("View Patient", key="view_saved_patient_btn"):
-                                            st.session_state['selected_patient_id'] = selected_patient_id
-                                            st.session_state['show_patient_list'] = True
-                                            st.session_state['nav_radio'] = "Patients"
-                                            st.rerun()
-                                    except Exception as e:
-                                        st.error(f"Failed to save analysis: {e}")
-                                    finally:
-                                        db.close()
-        
-        except Exception as e:
-            st.error(f"Error processing image: {str(e)}")
-            st.write("Please try another image or check the file format.")
-
-# About page
-if nav_choice == "About":
-    st.header("About This App")
-    st.markdown(
-        """
-        This Streamlit application demonstrates an end-to-end workflow for lung cancer scan analysis:
-        
-        - Upload and preprocess DICOM and image files with medical-grade windowing.
-        - Run predictions with selectable models (currently mocked for demo).
-        - Visualize results using confidence gauges, activation maps, and feature maps.
-        - Manage patients and persist scan analyses to a database with image storage.
-        
-        Roadmap:
-        - Integrate real trained models (TensorFlow/PyTorch) with Grad-CAM.
-        - Batch analysis and 3D series support.
-        - Exportable PDF/CSV reports and audit logging.
-        """
-    )
-    st.info("Use the sidebar Navigation to switch to Analyze, Patients, History, or Compare Models.")
-    st.stop()
+logger.info("Application session completed")
