@@ -53,8 +53,6 @@ instance/
 *.sqlite
 *.sqlite3
 
-# Model files (optional - uncomment if you don't want to track trained models)
+# Model files (optional)
 # *.h5
 # *.keras
-# *.pkl
-# *.joblib
