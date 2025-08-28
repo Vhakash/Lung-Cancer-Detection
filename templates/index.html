@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lung Cancer Detector</title>
+    <!-- Link to the CSS file -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Lung Cancer Detector</h1>
+        <p>Upload a CT scan image to predict the type of lung tissue.</p>
+        
+        <div class="uploader">
+            <input id="file-input" type="file" accept="image/*">
+            <label for="file-input">Choose an Image</label>
+        </div>
+        
+        <div id="preview-container" class="hidden">
+            <img id="image-preview" src="#" alt="Image Preview"/>
+        </div>
+        
+        <button id="predict-button" disabled>Predict</button>
+        
+        <div id="results-container" class="hidden">
+            <h2>Prediction Results</h2>
+            <div id="results"></div>
+        </div>
+        
+    </div>
+    
+    <!-- Link to the JavaScript file -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
