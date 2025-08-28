@@ -4,8 +4,10 @@ A comprehensive machine learning project that uses Convolutional Neural Networks
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.20.0-orange.svg)
-![Flask](https://img.shields.io/badge/Flask-Web%20App-green.svg)
+![Flask](https://img.shields.io/badge/Flask-2.0+-green.svg)
+![OpenCV](https://img.shields.io/badge/OpenCV-4.5+-red.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-black.svg)](https://github.com/Vhakash/Lung-Cancer-Detection)
 
 ## 🎯 Project Overview
 
