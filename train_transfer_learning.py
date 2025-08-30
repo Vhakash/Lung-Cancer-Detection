@@ -109,4 +109,29 @@ data_augmentation = keras.Sequential([
 
 
 # -----------------------------STEP - 3 : B U I L D  T R A N S F E R  L E A R N I N G  M O D E L ------------------------------------
+print("\n🏗️ Building EfficientNet Transfer Learning Model...")
 
+#load the pre-trained transfer learning model
+base_model = EfficientNetB0(
+    weights = 'imagenet',
+    include_top = False,
+    input_shape = (224, 224, 3)
+)
+
+#freeze the base model initially
+base_model.trainable = False
+print(f"   • Base model loaded with {len(base_model.layers)} layers.")
+print("   • Base model frozen for feature extraction")
+
+# Create the complete model
+model = Sequential([
+    data_augmentation,              # Data augmentation
+    base_model,                     # Pre-trained feature extractor
+    GlobalAveragePooling2D(),       # Convert 2D features to 1D
+    Dropout(0.2),                   # Regularization
+    Dense(128, activation='relu'),   # Classification head
+    Dropout(0.5),
+    Dense(3, activation='softmax')   # 3 classes output
+])
+
+print(f"   • Model created with {model.count_params():,} total parameters")
