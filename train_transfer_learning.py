@@ -1,10 +1,10 @@
 import tensorflow as tf
-from tensorflow import keras 
+import keras
 from keras.applications import EfficientNetB0
 from keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from keras.optimizers import Adam
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
-from keras.layers import RandomFlip, RandomRotation, RandomZoom, RandomContrast, RandomZoom
+from keras.layers import RandomFlip, RandomRotation, RandomZoom, RandomContrast
 from keras.models import Sequential, Model
 import matplotlib.pyplot
 import numpy as np
@@ -91,3 +91,22 @@ def load_lung_cancer_data():
 
 # Load the data
 X_train, X_val, X_test, y_train, y_val, y_test, class_weights = load_lung_cancer_data()
+
+
+
+
+# -------------------------------- STEP 2  : D A T A  A U G M E N T A T I O N ------------------------------------
+#to tackle the issue of overfitting and improve model generalization and avoid class imbalance
+data_augmentation = keras.Sequential([
+    RandomFlip("horizontal"),
+    RandomRotation(0.1),
+    RandomZoom(0.1),
+    RandomContrast(0.1)
+])
+
+
+
+
+
+# -----------------------------STEP - 3 : B U I L D  T R A N S F E R  L E A R N I N G  M O D E L ------------------------------------
+
