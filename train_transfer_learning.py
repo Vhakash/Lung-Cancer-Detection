@@ -2,17 +2,19 @@ import tensorflow as tf
 import keras
 from keras.applications import EfficientNetB0
 from keras.layers import Dense, GlobalAveragePooling2D, Dropout
-from keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from keras.layers import RandomFlip, RandomRotation, RandomZoom, RandomContrast
 from keras.models import Sequential, Model
-import matplotlib.pyplot
+import matplotlib.pyplot as plt
 import numpy as np
 import json
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.model_selection import train_test_split
 
 
+
+#----------------- STEP 1: D A T A   P R E P A R A T I O N -----------------
 def load_lung_cancer_data():
     """
     Load and prepare the lung cancer data for transfer learning
@@ -135,3 +137,19 @@ model = Sequential([
 ])
 
 print(f"   • Model created with {model.count_params():,} total parameters")
+
+
+
+
+
+#----------------- STEP 4: M O D A L  C O M P I L A T I O N -----------------
+# --- Compile Model ---
+print("\n⚙️ Compiling model...")
+model.compile(
+    optimizer=Adam(learning_rate=0.001),
+    loss='categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+print("   • Model compiled for feature extraction phase")
+model.summary()
