@@ -153,3 +153,35 @@ model.compile(
 
 print("   • Model compiled for feature extraction phase")
 model.summary()
+
+
+
+
+#------------------------STEP 5: S E T   U P   C A L L B A C K S -----------------
+# --- Set up callbacks ---
+callbacks = [
+    EarlyStopping(
+        monitor = 'val_loss',
+        patience = 5,
+        restore_best_weights = True,
+        verbose = 1
+    ),
+
+    ModelCheckpoint(
+        'lung_cancer_transfer_model.h5',
+        monitor = 'val_loss',
+        save_best_only = True,
+        verbose = 1
+    ),
+
+    ReduceLROnPlateau(
+        monitor = 'val_loss',
+        factor = 0.2,
+        patience = 3,
+        min_lr = 1e-7,
+        verbose = 1
+    )
+
+]
+
+print("   • Callbacks configured")
