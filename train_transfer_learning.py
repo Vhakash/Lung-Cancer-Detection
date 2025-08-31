@@ -185,3 +185,25 @@ callbacks = [
 ]
 
 print("   • Callbacks configured")
+
+
+
+
+#------------------------STEP 6: PHASE 1 - F E A T U R E   E X T R A C T I O N (training) -----------------
+print("\n" + "=" * 50)
+print("\n🔍 Phase 1 - Feature Extraction...")
+print("=" * 50)
+
+history_1 = model.fit(
+    X_train, y_train,
+    validation_data = (X_val, y_val),
+    epochs = 15,
+    batch_size = 8,
+    class_weight = class_weights,
+    callbacks = callbacks,
+    verbose = 'auto'
+)
+
+print("✅ Phase 1 completed - Feature extraction training done")
+print("   • Model trained for 15 epochs on the training set")
+print("   • Validation loss: {:.4f}".format(history_1.history['val_loss'][-1]))
