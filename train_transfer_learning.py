@@ -207,3 +207,41 @@ history_1 = model.fit(
 print("✅ Phase 1 completed - Feature extraction training done")
 print("   • Model trained for 15 epochs on the training set")
 print("   • Validation loss: {:.4f}".format(history_1.history['val_loss'][-1]))
+
+
+
+
+#-----------------------Step 7: PHASE 2 - F I N E - T U N I N G ------------------------------------
+print("\n" + "="*50)
+print("\n🔍 Phase 2 - Fine Tuning...")
+print("=" * 50)
+
+# UNFREEZE the base model
+base_model.trainable = True
+print(f"   • Base model unfrozen for fine-tuning")
+
+#optional but i am freezing the first 100 layers
+for layer in base_model.layers[:100]:
+    layer.trainable = False
+print("   • First 100 layers frozen for fine-tuning")
+
+#Recompile with a lower learning rate
+model.compile(
+    optimizer = Adam(learning_rate = 0.0001),
+    loss = 'categorical_crossentropy',
+    metrics = ['accuracy']
+)
+print(f"  • Model recompiled for fine-tuning with lower learning rate")
+
+#Train for fine tuning
+history_2 = model.fit(
+    X_train, y_train,
+    validation_data = (X_val, y_val),
+    epochs = 20,
+    batch_size = 8,
+    class_weight = class_weights,
+    callbacks = callbacks,
+    verbose = 'auto'
+)
+
+print("✅ Phase 2 completed - Fine-tuning training done")
