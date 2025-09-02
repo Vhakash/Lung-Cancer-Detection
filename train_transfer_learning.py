@@ -245,3 +245,27 @@ history_2 = model.fit(
 )
 
 print("✅ Phase 2 completed - Fine-tuning training done")
+
+
+
+
+#---------------------Step 7: Evaluation Model---------------------
+print('\n📊 Evaluating model...')
+
+test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose = 'auto')
+
+print(f"   • Test Accuracy: {test_accuracy:.4f}")
+print(f"   • Test Loss: {test_loss:.4f}")
+
+#Make Predictions
+predictions = model.predict(X_test)
+predicted_class = np.argmax(predictions, axis = 1)
+
+true_classes = np.argmax(y_test, axis = 1)
+
+# Calculate per-class accuracy
+from sklearn.metrics import classification_report
+print("\n📈 Detailed Classification Report:")
+print(classification_report(true_classes,predicted_class))
+
+
