@@ -269,3 +269,49 @@ print("\n📈 Detailed Classification Report:")
 print(classification_report(true_classes,predicted_class))
 
 
+#---------------------Step 8: Save and Visualize the model---------------------
+print("\n💾 Saving model...")
+model.save('lung_cancer_transfer_model_final.h5')
+print("   • Model saved successfully")
+
+
+# --- Plot Training History ---
+print("\n📈 Plotting training history...")
+plt.figure(figsize=(12,4))
+
+#combine histories
+total_epochs_1 = len(history_1.history['accuracy'])
+total_epochs_2 = len(history_2.history['accuracy'])
+
+
+epochs_1 = range(1, total_epochs_1 + 1)
+epochs_2 = range(total_epochs_1 + 1, total_epochs_1 + total_epochs_2 + 1)
+
+
+# Plot accuracy
+plt.subplot(1, 2, 1)
+plt.plot(epochs_1, history_1.history['accuracy'], 'b-', label='Phase 1 Train')
+plt.plot(epochs_1, history_1.history['val_accuracy'], 'b--', label='Phase 1 Val')
+plt.plot(epochs_2, history_2.history['accuracy'], 'r-', label='Phase 2 Train')
+plt.plot(epochs_2, history_2.history['val_accuracy'], 'r--', label='Phase 2 Val')
+plt.title('Model Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+
+# Plot loss
+plt.subplot(1, 2, 2)
+plt.plot(epochs_1, history_1.history['loss'], 'b-', label='Phase 1 Train')
+plt.plot(epochs_1, history_1.history['val_loss'], 'b--', label='Phase 1 Val')
+plt.plot(epochs_2, history_2.history['loss'], 'r-', label='Phase 2 Train')
+plt.plot(epochs_2, history_2.history['val_loss'], 'r--', label='Phase 2 Val')
+plt.title('Model Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+
+plt.tight_layout()
+plt.savefig('transfer_learning_training_history.png', dpi=300, bbox_inches='tight')
+plt.show()
+
+print("✅ Training history saved as 'transfer_learning_training_history.png'")
